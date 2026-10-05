@@ -4,6 +4,10 @@
 
 Le texte d’un SMS/e-mail/lien et les valeurs d’un flux soumis sont traités à la demande uniquement pour une prédiction. Ils ne sont pas écrits dans la base historique ni dans les journaux applicatifs. Le texte envoyé à l’assistant externe est transmis à OpenAI si cette option est configurée ; ne jamais soumettre d’information confidentielle. Le fournisseur applique ses propres conditions de traitement.
 
+Le dashboard permet de télécharger un rapport JSON contenant le résultat, le score, le niveau de confiance et les explications. Pour réduire les divulgations accidentelles, il exclut le texte soumis et les caractéristiques brutes du flux. Le fichier est téléchargé sur l’appareil de l’utilisateur ; celui-ci reste responsable de sa conservation et de son partage.
+
+Le dashboard fournit aussi des recommandations générales de prévention adaptées au résultat. Elles ne constituent ni une preuve technique ni un avis d’intervention ; pour un incident potentiel, suivez les procédures officielles de votre organisation et demandez une vérification humaine.
+
 ## Historique et conservation
 
 SQLite contient le module, la prédiction, le score et niveau de confiance, et l’horodatage. Les entrées expirent au plus tard 30 jours après l’analyse ; purge à l’initialisation et lors de chaque enregistrement. Le fichier se trouve à `TOGOCYBER_DB_PATH` (par défaut `database/togocyber.sqlite3`). L’administrateur peut effacer l’historique en supprimant le fichier de base de données lorsqu’il est arrêté.
