@@ -1,0 +1,221 @@
+.stApp {
+  background: #f3f6fa;
+  color: #142744;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.block-container {
+  max-width: 1440px;
+  padding-top: 1.55rem;
+  padding-bottom: 3rem;
+}
+
+.tc-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 106px;
+  border-radius: 18px;
+  padding: 1.1rem 1.5rem;
+  margin-bottom: 1.4rem;
+  color: #ffffff;
+  background: linear-gradient(112deg, #082d5c 0%, #073d69 67%, #075b65 100%);
+  box-shadow: 0 12px 30px rgba(8, 45, 92, 0.12);
+}
+
+.tc-brand-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 54px;
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(91, 236, 211, 0.55);
+  border-radius: 17px;
+  color: #56e4ce;
+  font-size: 1.75rem;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tc-brand-copy {
+  flex: 1;
+}
+
+.tc-header h1 {
+  color: #ffffff;
+  margin: 0;
+  font-size: clamp(1.55rem, 3vw, 2rem);
+  line-height: 1.15;
+}
+
+.tc-header p {
+  color: #d8e9f5;
+  margin: 0.28rem 0 0;
+  font-size: 0.92rem;
+}
+
+.tc-header h1 span {
+  color: #58e2c9;
+}
+
+.tc-header .tc-kicker {
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  font-size: 0.67rem;
+  margin: 0 0 0.28rem;
+}
+
+.tc-header .tc-header-tag {
+  border: 1px solid rgba(210, 239, 246, 0.35);
+  border-radius: 999px;
+  color: #e6f7fa;
+  padding: 0.48rem 0.78rem;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+[data-testid="stSidebar"] {
+  background: #edf2f8;
+  border-right: 1px solid #dce5ef;
+}
+
+[data-testid="stSidebar"] > div:first-child {
+  padding-top: 1.25rem;
+}
+
+.tc-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.3rem 0 0.65rem;
+  color: #102b50;
+}
+
+.tc-sidebar-shield {
+  display: grid;
+  place-items: center;
+  width: 41px;
+  height: 41px;
+  border-radius: 13px;
+  background: #082d5c;
+  color: #57e3cc;
+  font-size: 1.35rem;
+}
+
+.tc-sidebar-brand strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.tc-sidebar-brand em {
+  color: #008e82;
+  font-style: normal;
+}
+
+.tc-sidebar-brand small {
+  display: block;
+  margin-top: 0.12rem;
+  color: #61748b;
+  font-size: 0.72rem;
+}
+
+.tc-sidebar-label {
+  margin: 1rem 0 0.3rem;
+  color: #74869b;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+[data-testid="stSidebar"] [role="radiogroup"] {
+  gap: 0.2rem;
+}
+
+[data-testid="stSidebar"] [role="radiogroup"] label {
+  border-radius: 10px;
+  padding: 0.42rem 0.55rem;
+}
+
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
+  background: #d8f3ee;
+  color: #075e58;
+  font-weight: 700;
+}
+
+[data-testid="stMetric"] {
+  border: 1px solid #e3eaf2;
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  background: #ffffff;
+  box-shadow: 0 5px 18px rgba(16, 43, 80, 0.035);
+}
+
+[data-testid="stMetricLabel"] {
+  color: #61748b;
+  font-size: 0.78rem;
+}
+
+[data-testid="stMetricValue"] {
+  color: #102b50;
+  font-weight: 750;
+}
+
+[data-testid="stForm"] {
+  border-color: #e1e9f2;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+[data-testid="stAlert"] {
+  border-radius: 12px;
+}
+
+div.stButton > button[kind="primary"],
+div.stFormSubmitButton > button[kind="primary"] {
+  background: #008f83;
+  color: #ffffff;
+  border: 1px solid #008f83;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+div.stButton > button:focus,
+div.stFormSubmitButton > button:focus {
+  outline: 3px solid #082d5c;
+  outline-offset: 2px;
+}
+
+div.stButton > button:hover,
+div.stFormSubmitButton > button:hover {
+  border-color: #06766e;
+  background: #06766e;
+  color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .block-container {
+    padding: 0.8rem 0.8rem 2rem;
+  }
+
+  .tc-header {
+    min-height: 84px;
+    border-radius: 14px;
+    padding: 0.85rem;
+  }
+
+  .tc-brand-mark {
+    flex-basis: 44px;
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+  }
+
+  .tc-header .tc-header-tag {
+    display: none;
+  }
+
+  [data-testid="stMetricValue"] {
+    font-size: 1.15rem;
+  }
+}

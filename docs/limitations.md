@@ -1,0 +1,11 @@
+# Limites, faux positifs et faux négatifs
+
+- **Données de démonstration uniquement.** Des CSV publics ont été téléchargés localement depuis des miroirs épinglés et leur SHA-256 vérifié. Les fichiers/artefacts restent ignorés par Git. Le réseau utilise le train/test du miroir UNSW-NB15 ; ses champs de port absents sont mis à zéro. Le texte utilise un corpus de courriels anglais. Leurs scores sont consignés dans [demo_results.md](demo_results.md).
+- **Aucune validation togolaise/CIC.** Aucun corpus CIC-IDS2017, SMS, français togolais, Mobile Money ni données annotées avec consentement n’a été utilisé. La démo ne vérifie pas la généralisation CIC→UNSW.
+- **Décalage réseau.** Les fenêtres, unités et distributions CIC-IDS2017 et UNSW-NB15 divergent ; une projection de colonnes ne garantit pas la transportabilité. Le test croisé peut produire des faux positifs/faux négatifs.
+- **Phishing évolutif.** Les attaques et usages togolais de Mobile Money changent rapidement. Le français familier, l’éwé translittéré, le mélange de langues, les URL masquées et l’obfuscation sont mal couverts sans corpus réel et évalué.
+- **Déséquilibre.** Un jeu déséquilibré peut masquer des erreurs ; examiner précision/rappel par classe, matrice de confusion, coût des erreurs et seuils avant tout usage réel.
+- **Explications locales.** SHAP/LIME sont des approximations d’un modèle, variables selon l’exemple ; aucune causalité ou garantie.
+- **Assistant externe.** Latence, coût et disponibilité du modèle OpenAI dépendent du fournisseur et de sa configuration. Le code utilise timeout réseau et erreurs explicites ; les requêtes ne sont pas stockées localement.
+- **Produit.** Prototype sans authentification API, multi-tenant, surveillance, garanties de disponibilité ou audit indépendant. CORS n’est pas un contrôle d’accès.
+- **Éthique.** Analyser uniquement les messages et flux autorisés. Aucun scan actif n’est proposé. L’outil n’est pas adapté aux informations secrètes/confidentielles ni aux décisions critiques.

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TogoCyber AI — Présentation</title>
+  <style>
+    :root { color-scheme: light; font-family: "Segoe UI", Arial, sans-serif; color: #10233f; background: #f6f8fb; }
+    body { margin: 0; }
+    nav { position: sticky; top: 0; z-index: 2; display: flex; gap: .6rem; overflow-x: auto; padding: .8rem; background: #0A1F44; }
+    nav a { color: #efffff; padding: .5rem .7rem; border-radius: .3rem; white-space: nowrap; }
+    nav a:focus { outline: 3px solid #ffffff; outline-offset: 2px; }
+    main { scroll-behavior: smooth; }
+    section { box-sizing: border-box; min-height: 88vh; max-width: 960px; margin: 1rem auto; padding: clamp(1.5rem, 5vw, 4rem); background: #ffffff; border-top: .55rem solid #006f68; border-radius: .7rem; box-shadow: 0 3px 18px #10233f18; }
+    h1, h2 { color: #0A1F44; }
+    h1 { font-size: clamp(2.2rem, 7vw, 4.5rem); }
+    h2 { font-size: clamp(1.7rem, 5vw, 3rem); }
+    p, li { font-size: clamp(1.1rem, 2.5vw, 1.45rem); line-height: 1.55; }
+    .kicker { color: #006f68; font-weight: 700; letter-spacing: .12em; }
+    .notice { padding: 1rem; border-left: .3rem solid #006f68; background: #eaf0f5; }
+    .metric { color: #922b21; font-weight: 700; }
+    @media print { nav { display: none; } section { min-height: 95vh; box-shadow: none; page-break-after: always; } }
+  </style>
+</head>
+<body>
+  <nav aria-label="Navigation des diapositives">
+    <a href="#slide-1">1. Contexte</a><a href="#slide-2">2. Solution</a>
+    <a href="#slide-3">3. Méthode</a><a href="#slide-4">4. Mesure</a>
+    <a href="#slide-5">5. Explicabilité</a><a href="#slide-6">6. Produit</a>
+    <a href="#slide-7">7. Limites</a>
+  </nav>
+  <main>
+    <section id="slide-1" aria-labelledby="title-1">
+      <p class="kicker">CYBERSÉCURITÉ POUR TOUS</p>
+      <h1 id="title-1">TogoCyber AI</h1>
+      <p>Plateforme de recherche pour détecter, expliquer et prévenir des cybermenaces auprès des citoyens, PME et opérateurs au Togo.</p>
+      <p class="notice">Prototype de recherche — ne pas utiliser comme service de sécurité certifié.</p>
+    </section>
+    <section id="slide-2" aria-labelledby="title-2">
+      <p class="kicker">LA SOLUTION</p><h2 id="title-2">Une chaîne intégrée</h2>
+      <ul><li>Détection réseau : Random Forest et XGBoost.</li><li>SMS/e-mail : TF-IDF et classification de texte.</li><li>FastAPI versionnée et tableau de bord Streamlit.</li><li>Assistant OpenAI optionnel, configuré par secret d’environnement.</li></ul>
+    </section>
+    <section id="slide-3" aria-labelledby="title-3">
+      <p class="kicker">MÉTHODE SCIENTIFIQUE</p><h2 id="title-3">Données et évaluation</h2>
+      <ul><li>CIC-IDS2017 pour l’entraînement réseau ; UNSW-NB15 pour l’essai de généralisation.</li><li>Deux modèles comparés par module ; split stratifié 60/20/20.</li><li>Prétraitement appris dans les pipelines sur le train uniquement.</li><li>Exemples togolais à collecter, anonymiser et annoter avec consentement.</li></ul>
+    </section>
+    <section id="slide-4" aria-labelledby="title-4">
+      <p class="kicker">RÉSULTATS</p><h2 id="title-4">Aucune métrique inventée</h2>
+      <p class="metric">RÉSULTAT NON VÉRIFIÉ — à exécuter avec les vraies données.</p>
+      <p>Les jeux de données ne sont pas inclus. Insérer ici les métriques et tailles de test produites réellement après exécution ; ne pas remplacer cette mention par une estimation.</p>
+    </section>
+    <section id="slide-5" aria-labelledby="title-5">
+      <p class="kicker">EXPLICABILITÉ ET INCLUSION</p><h2 id="title-5">Comprendre les alertes</h2>
+      <ul><li>SHAP montre les contributions locales des variables d’un flux.</li><li>LIME met en évidence les termes associés au score de phishing.</li><li>Comparer le français standard et le français togolais exige des données annotées représentatives.</li><li>Une explication n’est ni preuve ni causalité.</li></ul>
+    </section>
+    <section id="slide-6" aria-labelledby="title-6">
+      <p class="kicker">PRODUIT RESPONSABLE</p><h2 id="title-6">Prêt pour la démonstration</h2>
+      <ul><li>Pages confidentialité, conditions, cookies et transparence.</li><li>SQLite conserve les métadonnées seulement, au plus 30 jours.</li><li>Erreurs explicites, interface mobile et niveaux de confiance.</li><li>Aucun scan réseau actif ni stockage local du contenu brut.</li></ul>
+    </section>
+    <section id="slide-7" aria-labelledby="title-7">
+      <p class="kicker">LIMITES ET SUITE</p><h2 id="title-7">Une aide, pas une garantie</h2>
+      <ul><li>Faux positifs et faux négatifs ; dérive des menaces et décalage CIC/UNSW.</li><li>Licences, biais, qualité d’annotation et performance à vérifier.</li><li>Authentification, TLS, quotas, supervision et audit requis avant toute exposition publique.</li></ul>
+      <p class="notice">Analyser uniquement des données auxquelles vous êtes autorisé à accéder.</p>
+    </section>
+  </main>
+</body>
+</html>
