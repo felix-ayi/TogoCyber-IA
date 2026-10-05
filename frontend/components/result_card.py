@@ -12,6 +12,8 @@ def render_result(result: dict, positive_label: str, negative_label: str) -> Non
     render_confidence(result["confidence_level"], result["confidence"])
     explanations = result.get("explanation", [])
     if explanations:
+        if result.get("explanation_truncated", False):
+            st.caption("L’explication LIME porte sur les 2 000 premiers caractères ; la prédiction utilise le message complet.")
         st.subheader("Pourquoi ce résultat ?")
         st.caption(
             "L’explication porte sur le score de menace (phishing/malveillant), même si la classe retenue est légitime. "

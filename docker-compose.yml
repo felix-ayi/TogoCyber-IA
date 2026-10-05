@@ -12,7 +12,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - togocyber-data:/app/database
       - ./models/artifacts:/app/models/artifacts:ro
@@ -26,7 +26,7 @@ services:
     environment:
       TOGOCYBER_API_URL: http://api:8000
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"
     depends_on:
       - api
     restart: unless-stopped

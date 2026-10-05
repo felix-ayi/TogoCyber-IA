@@ -8,11 +8,13 @@ Les deux entraîneurs et les notebooks exigent les CSV source et ne fabriquent p
 
 ## Docker Compose
 
-Depuis la racine, `docker compose up --build` publie le dashboard (8501) et API (8000). L’historique persiste dans un volume Docker. Placer des modèles entraînés dans `models/artifacts` (lecture seule dans le conteneur API). Configurer `OPENAI_API_KEY` dans l’environnement local, jamais dans le code. Les téléchargements de corpus ne sont pas montés par défaut.
+Depuis la racine, `docker compose up --build` publie le dashboard (8501) et API (8000) sur l’interface locale uniquement. L’historique persiste dans un volume Docker. Placer des modèles entraînés dans `models/artifacts` (lecture seule dans le conteneur API). Configurer `OPENAI_API_KEY` dans l’environnement local, jamais dans le code. Les téléchargements de corpus ne sont pas montés par défaut.
+
+Le point d’entrée phishing borne LIME à 200 échantillons sur au plus 2 000 caractères et limite à deux le nombre d’analyses simultanées par processus ; la prédiction continue d’utiliser le texte complet jusqu’à 20 000 caractères. Les demandes concurrentes supplémentaires reçoivent HTTP 429. Cette protection locale ne constitue pas une limitation de débit distribuée.
 
 ## Production
 
-Cette configuration est une démonstration : endpoints sans authentification, aucune isolation multi-tenant, quotas, TLS ou supervision. Avant exposition, utiliser une terminaison TLS et passerelle authentifiée, limiter tailles/fréquences, configurer secrets de façon gérée, sauvegarder/expirer SQLite, contrôler licences des données et modèles, et vérifier permissions du système de fichiers.
+Cette configuration est une démonstration : endpoints sans authentification, aucune isolation multi-tenant, quotas, TLS ou supervision. Avant toute exposition, utiliser une terminaison TLS et passerelle authentifiée, appliquer des limites de débit partagées et de taille des requêtes, configurer les secrets de façon gérée, sauvegarder/expirer SQLite, contrôler les licences des données et modèles, et vérifier les permissions du système de fichiers. La limite de concurrence phishing en mémoire ne remplace pas ces contrôles.
 
 ## Dossiers sensibles
 

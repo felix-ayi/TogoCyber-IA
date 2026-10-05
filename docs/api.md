@@ -30,7 +30,7 @@ Toutes les 9 clés sont obligatoires, numériques et finies ; les compteurs, dur
 
 ## Analyse phishing
 
-`POST /api/v1/phishing/analyze` avec `{"text":"..."}` (1–20 000 caractères). Retourne classe, probabilité phishing, niveau de confiance, termes LIME et identifiant historique. HTTP 422 si vide/invalide, HTTP 503 si modèle absent.
+`POST /api/v1/phishing/analyze` avec `{"text":"..."}` (1–20 000 caractères). Retourne classe, probabilité phishing, niveau de confiance, termes LIME et identifiant historique. La prédiction utilise le message complet ; LIME est borné à 200 échantillons et aux 2 000 premiers caractères. `explanation_truncated` signale quand l’explication ne couvre qu’un extrait. Au plus deux analyses phishing simultanées sont admises par processus ; les demandes excédentaires reçoivent HTTP 429. HTTP 422 si vide/invalide, HTTP 503 si modèle absent.
 
 ## Assistant
 
@@ -42,4 +42,4 @@ Toutes les 9 clés sont obligatoires, numériques et finies ; les compteurs, dur
 
 ## Sécurité d’exploitation
 
-Prototype sans authentification ni autorisation par tenant : ne pas exposer publiquement sans reverse proxy TLS, authentification, limitation de débit, supervision et contrôles opérateur. CORS configurable ; ne permet aucun scan réseau.
+Prototype sans authentification ni autorisation par tenant : ne pas exposer publiquement sans reverse proxy TLS, authentification, limitation de débit, supervision et contrôles opérateur. La limite de concurrence est locale à chaque processus ; elle ne remplace pas une limitation de débit partagée entre processus ou instances. CORS configurable ; ne permet aucun scan réseau.

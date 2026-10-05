@@ -22,4 +22,5 @@ class PhishingAnalysisResponse(BaseModel):
     confidence: float = Field(ge=0, le=1)
     confidence_level: Literal["low", "medium", "high"]
     explanation: list[PhishingExplanation]
+    explanation_truncated: bool
     history_id: int
