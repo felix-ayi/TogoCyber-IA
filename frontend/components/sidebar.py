@@ -1,11 +1,23 @@
 import streamlit as st
 
-from frontend.services.api_client import APIError, get_health
+from frontend.services.api_client import APIError, get_health, logout
 PAGES = [
     "Accueil",
     "Analyse réseau",
     "Analyse phishing / SMS",
+    "Analyse URL",
     "Historique",
+    "Incidents",
+    "Tableau de bord SOC",
+    "Alertes (SOC)",
+    "Recherche (SOC)",
+    "Threat Intel (IOC)",
+    "Corrélation & règles",
+    "Supervision ML",
+    "Playbooks",
+    "Intégrations & notifications",
+    "Audit de sécurité",
+    "Gestion des utilisateurs",
     "Assistant prévention",
     "À propos",
     "Transparence",
@@ -18,7 +30,19 @@ PAGE_ICONS = {
     "Accueil": "⌂",
     "Analyse réseau": "⌁",
     "Analyse phishing / SMS": "✉",
+    "Analyse URL": "↗",
     "Historique": "◷",
+    "Incidents": "⚑",
+    "Tableau de bord SOC": "▦",
+    "Alertes (SOC)": "🔔",
+    "Recherche (SOC)": "⌕",
+    "Threat Intel (IOC)": "☣",
+    "Corrélation & règles": "⇄",
+    "Supervision ML": "📈",
+    "Playbooks": "🗂",
+    "Intégrations & notifications": "🔌",
+    "Audit de sécurité": "▤",
+    "Gestion des utilisateurs": "☰",
     "Assistant prévention": "✦",
     "À propos": "ⓘ",
     "Transparence": "◈",
@@ -36,6 +60,38 @@ def select_page() -> str:
             unsafe_allow_html=True,
         )
         st.caption("Prototype de recherche · N’entrez aucun secret ni donnée sensible.")
+        user = st.session_state.get("auth_user", {})
+        role = user.get("role")
+        admin_only_pages = {"Audit de sécurité", "Gestion des utilisateurs"}
+        soc_pages = {
+            "Tableau de bord SOC",
+            "Alertes (SOC)",
+            "Recherche (SOC)",
+            "Threat Intel (IOC)",
+            "Corrélation & règles",
+            "Supervision ML",
+            "Playbooks",
+            "Intégrations & notifications",
+        }
+        if role == "Admin":
+            visible_pages = PAGES
+        elif role == "Analyst":
+            visible_pages = [page for page in PAGES if page not in admin_only_pages]
+        else:
+            visible_pages = [
+                page for page in PAGES if page not in admin_only_pages and page not in soc_pages
+            ]
+        if user:
+            st.caption(f"Connecté : {user.get('email')} · rôle {user.get('role')}")
+            if st.button("Se déconnecter", key="logout_button"):
+                try:
+                    logout()
+                except APIError as exc:
+                    st.warning(f"Déconnexion distante impossible : {exc}")
+                finally:
+                    st.session_state.pop("auth_token", None)
+                    st.session_state.pop("auth_user", None)
+                st.rerun()
         try:
             health = get_health()
             missing = [name for name, ready in health["models"].items() if not ready]
@@ -57,7 +113,7 @@ def select_page() -> str:
         st.markdown('<p class="tc-sidebar-label">ESPACE DE TRAVAIL</p>', unsafe_allow_html=True)
         return st.radio(
             "Navigation",
-            PAGES,
+            visible_pages,
             format_func=lambda page: f"{PAGE_ICONS[page]}   {page}",
             label_visibility="collapsed",
             key="main_navigation",

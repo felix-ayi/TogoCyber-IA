@@ -51,6 +51,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(report["schema_version"], "1.0")
         self.assertEqual(report["generated_at"], "2026-10-05T12:00:00+00:00")
         self.assertEqual(report["threat_probability"], 0.91)
+        self.assertIsNone(report["risk_score"])
         self.assertEqual(report["explanation"][0]["term"], "verify")
         self.assertTrue(report["explanation_truncated"])
         self.assertTrue(report["recommended_actions"]["actions"])

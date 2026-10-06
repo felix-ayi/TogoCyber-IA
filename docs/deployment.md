@@ -8,7 +8,9 @@ Les deux entraîneurs et les notebooks exigent les CSV source et ne fabriquent p
 
 ## Docker Compose
 
-Depuis la racine, `docker compose up --build` publie le dashboard (8501) et API (8000) sur l’interface locale uniquement. L’historique persiste dans un volume Docker. Placer des modèles entraînés dans `models/artifacts` (lecture seule dans le conteneur API). Configurer `OPENAI_API_KEY` dans l’environnement local, jamais dans le code. Les téléchargements de corpus ne sont pas montés par défaut.
+Depuis la racine, copier `.env.example` vers `.env`, définir une `AUTH_SECRET_KEY` aléatoire d'au moins 32 caractères et lancer `docker compose up --build`. Le dashboard (8501) et l’API (8000) sont publiés sur l’interface locale uniquement. Pour créer le premier administrateur, renseigner également `BOOTSTRAP_ADMIN_EMAIL` et `BOOTSTRAP_ADMIN_PASSWORD` (11 caractères minimum) avant le premier démarrage ; supprimer ces variables après création. L'historique, les utilisateurs et les sessions sont conservés dans le volume SQLite. Placer des modèles entraînés dans `models/artifacts` (lecture seule dans le conteneur API). Configurer `OPENAI_API_KEY` dans l’environnement local, jamais dans le code. Les téléchargements de corpus ne sont pas montés par défaut.
+
+Sans `AUTH_SECRET_KEY`, le mode local génère une clé éphémère à chaque démarrage : les jetons existants deviennent invalides au redémarrage. Définir une clé persistante est obligatoire pour une installation durable ou multi-processus.
 
 Le point d’entrée phishing borne LIME à 200 échantillons sur au plus 2 000 caractères et limite à deux le nombre d’analyses simultanées par processus ; la prédiction continue d’utiliser le texte complet jusqu’à 20 000 caractères. Les demandes concurrentes supplémentaires reçoivent HTTP 429. Cette protection locale ne constitue pas une limitation de débit distribuée.
 

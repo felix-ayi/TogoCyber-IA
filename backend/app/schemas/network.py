@@ -21,6 +21,12 @@ class NetworkAnalysisResponse(BaseModel):
     malicious_probability: float = Field(ge=0, le=1)
     confidence: float = Field(ge=0, le=1)
     confidence_level: Literal["low", "medium", "high"]
+    risk_score: int = Field(ge=0, le=100)
+    severity: Literal["VERY_LOW", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    classification: Literal["malicious", "benign"]
+    indicators: list[dict]
+    recommendations: list[str]
     features: dict[str, float]
     explanation: list[NetworkExplanation]
     history_id: int
+    incident_id: int | None = None

@@ -21,7 +21,7 @@ class PhishingTests(unittest.TestCase):
 
     def test_whitespace_only_text_is_rejected(self):
         with self.assertRaises(HTTPException) as error:
-            analyze_phishing(PhishingAnalysisRequest(text="   "))
+            analyze_phishing(PhishingAnalysisRequest(text="   "), user={"id": 1})
         self.assertEqual(error.exception.status_code, 422)
 
     def test_request_length_boundary_is_enforced(self):
@@ -65,7 +65,7 @@ class PhishingTests(unittest.TestCase):
                 side_effect=AnalysisCapacityExceeded("busy"),
             ):
                 with self.assertRaises(HTTPException) as error:
-                    analyze_phishing(PhishingAnalysisRequest(text="message"))
+                    analyze_phishing(PhishingAnalysisRequest(text="message"), user={"id": 1})
             self.assertEqual(error.exception.status_code, 429)
         finally:
             for _ in range(acquired_count):
@@ -77,6 +77,8 @@ class PhishingTests(unittest.TestCase):
             "phishing_probability": 0.9,
             "confidence": 0.9,
             "confidence_level": "high",
+            "model": "logistic_regression",
+            "model_version": "unversioned",
         }
         with (
             patch("backend.app.services.phishing_service.predict_phishing", return_value=prediction),

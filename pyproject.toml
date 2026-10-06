@@ -1,0 +1,15 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", "notebooks", "presentation"]
+
+[tool.ruff.lint]
+# Gate on defects that matter (syntax errors + pyflakes) rather than cosmetic
+# style rules, so linting stays meaningful without forcing a full reformat.
+select = ["E9", "F"]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "notebooks", "presentation", "scripts"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -73,7 +73,7 @@ class NetworkTests(unittest.TestCase):
         values = {name: 0 for name in NETWORK_FEATURES}
         with patch("backend.app.api.v1.routes.network.network_analysis", side_effect=FileNotFoundError("Le modèle n'est pas entraîné")):
             with self.assertRaises(HTTPException) as error:
-                analyze_network(NetworkAnalysisRequest(features=values))
+                analyze_network(NetworkAnalysisRequest(features=values), user={"id": 1})
         self.assertEqual(error.exception.status_code, 503)
 
 

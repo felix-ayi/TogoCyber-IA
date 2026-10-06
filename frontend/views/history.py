@@ -7,7 +7,7 @@ from frontend.services.api_client import APIError, get_history
 
 def render() -> None:
     st.subheader("Historique récent")
-    st.caption("Seuls le type d’analyse, le résultat, la confiance et l’horodatage sont conservés, pour 30 jours maximum.")
+    st.caption("Métadonnées de résultat, score de risque et modèle : conservés au plus 30 jours. Les entrées sont limitées à votre compte.")
     try:
         items = get_history()
     except APIError as exc:

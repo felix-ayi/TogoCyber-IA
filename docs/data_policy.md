@@ -8,9 +8,15 @@ Le dashboard permet de télécharger un rapport JSON contenant le résultat, le 
 
 Le dashboard fournit aussi des recommandations générales de prévention adaptées au résultat. Elles ne constituent ni une preuve technique ni un avis d’intervention ; pour un incident potentiel, suivez les procédures officielles de votre organisation et demandez une vérification humaine.
 
+L’inspection d’URL examine localement sa structure uniquement : elle ne visite pas l’adresse, n’effectue aucune résolution DNS et ne contacte pas de service de réputation externe. L’URL fournie n’est ni enregistrée dans l’historique ni incluse dans un journal par ce service.
+
 ## Historique et conservation
 
-SQLite contient le module, la prédiction, le score et niveau de confiance, et l’horodatage. Les entrées expirent au plus tard 30 jours après l’analyse ; purge à l’initialisation et lors de chaque enregistrement. Le fichier se trouve à `TOGOCYBER_DB_PATH` (par défaut `database/togocyber.sqlite3`). L’administrateur peut effacer l’historique en supprimant le fichier de base de données lorsqu’il est arrêté.
+SQLite contient le module, la prédiction, le score et niveau de confiance, l'identifiant interne du compte propriétaire et l'horodatage. Les entrées expirent au plus tard 30 jours après l'analyse ; purge à l'initialisation et lors de chaque enregistrement. Le fichier se trouve à `TOGOCYBER_DB_PATH` (par défaut `database/togocyber.sqlite3`). L'administrateur peut effacer l'historique en supprimant le fichier de base de données lorsque l'application est arrêtée.
+
+Les comptes conservent l'adresse e-mail, un hash PBKDF2 du mot de passe, le rôle et l'état du compte. Les sessions gardent uniquement le hash de l'identifiant du jeton, son expiration et son statut de révocation. Les échecs de connexion sont limités à cinq en quinze minutes par empreinte d'adresse cliente ; l'adresse IP brute n'est pas conservée.
+
+Les incidents créés pour les scores `HIGH` ou `CRITICAL` conservent le module, la classe prédite, le score, la sévérité, l'état, l'identifiant du compte propriétaire et un journal des transitions comportant l'identifiant du compte opérateur. Ils ne sont pas supprimés par la purge des analyses après 30 jours ; dans ce prototype, leur suppression nécessite l'effacement de la base par l'administrateur. Définir une durée de conservation et un processus d'effacement avant toute utilisation réelle.
 
 ## Droits, jeux et annotations
 

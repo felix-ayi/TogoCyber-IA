@@ -12,9 +12,16 @@ def render_result(result: dict, positive_label: str, negative_label: str) -> Non
     probability = result[probability_key]
     st.write(f"Probabilité estimée de menace : **{probability:.1%}**")
     render_confidence(result["confidence_level"], result["confidence"])
+    if "risk_score" in result and "severity" in result:
+        st.metric("Score de risque", f"{result['risk_score']}/100", result["severity"])
+    if result.get("incident_id") is not None:
+        st.warning(
+            f"Incident de suivi n° {result['incident_id']} créé dans le Centre d’incidents. "
+            "Cette alerte doit être vérifiée par un analyste."
+        )
     guidance = get_action_guidance(result["module"], result["prediction"])
     st.subheader(guidance["title"])
-    for action in guidance["actions"]:
+    for action in result.get("recommendations", guidance["actions"]):
         st.markdown(f"- {action}")
     st.caption(guidance["caution"])
     explanations = result.get("explanation", [])

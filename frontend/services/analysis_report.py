@@ -22,13 +22,17 @@ def build_analysis_report(result: dict, generated_at: datetime | None = None) ->
         "module": result["module"],
         "prediction": result["prediction"],
         "threat_probability": result[probability_key],
+        "risk_score": result.get("risk_score"),
+        "severity": result.get("severity"),
         "confidence": result["confidence"],
         "confidence_level": result["confidence_level"],
         "explanation": result.get("explanation", []),
         "explanation_truncated": result.get("explanation_truncated", False),
-        "recommended_actions": get_action_guidance(
-            result["module"], result["prediction"],
-        ),
+        "recommended_actions": {
+            "actions": result["recommendations"]
+            if "recommendations" in result
+            else get_action_guidance(result["module"], result["prediction"])["actions"],
+        },
         "privacy": {
             "submitted_content_included": False,
             "note": "Le texte soumis et les caractéristiques brutes ne sont pas inclus.",

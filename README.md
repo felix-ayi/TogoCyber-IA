@@ -13,7 +13,7 @@ TogoCyber-AI/
 ├── data/
 │   ├── annotations/         # Gabarit vide pour annotations togolaises consenties
 │   └── raw/                 # Placez ici les CSV téléchargés légalement
-├── docs/                    # Architecture, données, API, limites, prompt, déploiement
+├── docs/                    # Architecture, données, base, API, limites, prompt, déploiement, contribution
 ├── frontend/                # Dashboard Streamlit, composants et vues légales
 ├── ml/
 │   ├── common/               # Schéma réseau partagé, métriques, EDA, artefacts
@@ -85,13 +85,22 @@ Le contrat API réseau utilise les variables : `duration` (secondes), `src_bytes
 ## Tests
 
 ```powershell
-python -m unittest discover -s tests -v
+python -m pytest
 ```
 
-Les tests de contrat ne prétendent pas évaluer la qualité des modèles sur de vraies données. Voir [docs/limitations.md](docs/limitations.md) et [docs/deployment.md](docs/deployment.md).
+`python -m unittest discover -s tests -v` fonctionne aussi (tests écrits en `unittest`). La suite n’exige pas de modèles entraînés : le chargement des `.joblib` est bouchonné. Une intégration continue (`.github/workflows/ci.yml`) enchaîne lint (ruff), tests (pytest), contrôles de sécurité (bandit bloquant, pip-audit informatif) et build Docker. Les tests de contrat ne prétendent pas évaluer la qualité des modèles sur de vraies données. Voir [docs/limitations.md](docs/limitations.md), [docs/deployment.md](docs/deployment.md) et [docs/contributing.md](docs/contributing.md).
+
+## Base de données
+
+SQLite local (`database/togocyber.sqlite3`, ignoré par Git), initialisé de façon idempotente avec des migrations additives non destructives ; historique purgé après `RETENTION_DAYS`. La chaîne de connexion est centralisée via `DATABASE_URL` (seul `sqlite:///…` est câblé ; une URL `postgresql://…` est rejetée au démarrage tant que l’adaptateur Postgres n’existe pas). Outre l’authentification et l’historique, la base porte les tables SOC : alertes, incidents, IOC, règles de détection et corrélations, retours modèles, notifications et playbooks. Le schéma est documenté dans [docs/database.md](docs/database.md).
+
 
 ## Confidentialité
 
-Le texte et les caractéristiques réseau ne sont pas conservés dans SQLite. L’historique garde uniquement module, classe prédite, confiance et horodatage, 30 jours maximum. L’assistant OpenAI ne fonctionne que si `OPENAI_API_KEY` est configurée ; son message est envoyé au fournisseur et soumis à ses conditions. Ne saisissez aucune information confidentielle.
+Le texte et les caractéristiques réseau ne sont pas conservés dans SQLite. L'historique garde le module, la classe prédite, la confiance, l'identifiant interne du propriétaire et l'horodatage, 30 jours maximum. L'assistant OpenAI ne fonctionne que si `OPENAI_API_KEY` est configurée ; son message est envoyé au fournisseur et soumis à ses conditions. Ne saisissez aucune information confidentielle.
 
 Pages de confidentialité, conditions d’utilisation, cookies, transparence et avertissements sont accessibles dans le menu du dashboard. Voir [docs/data_policy.md](docs/data_policy.md).
+
+## Comptes et authentification
+
+L'API et le dashboard demandent une connexion. L'inscription publique crée des comptes `User` uniquement ; les analyses sont liées au compte et les utilisateurs ne voient que leur propre historique. Pour créer le premier administrateur, configurez `BOOTSTRAP_ADMIN_EMAIL` et `BOOTSTRAP_ADMIN_PASSWORD` dans `.env` avant le démarrage. Seul un administrateur peut ensuite créer des comptes `Analyst` ou `User`. Voir [docs/api.md](docs/api.md) et [docs/deployment.md](docs/deployment.md).
