@@ -1,12 +1,21 @@
 import unittest
+from dataclasses import replace
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from backend.app.core import rate_limit
 from backend.app.core.rate_limit import RateLimitMiddleware, SlidingWindowRateLimiter
 
 
 class SlidingWindowRateLimiterTests(unittest.TestCase):
+    @staticmethod
+    def _request(peer: str, forwarded: str | None = None):
+        headers = {} if forwarded is None else {"x-forwarded-for": forwarded}
+        return SimpleNamespace(headers=headers, client=SimpleNamespace(host=peer))
+
     def test_disabled_limiter_always_allows(self):
         limiter = SlidingWindowRateLimiter(0)
         for _ in range(100):
@@ -34,6 +43,24 @@ class SlidingWindowRateLimiterTests(unittest.TestCase):
         # Force a sweep well past the window so the stale bucket is pruned.
         limiter.allow("kept", now=100.0)
         self.assertNotIn("gone", limiter._hits)
+
+    def test_untrusted_forwarded_header_cannot_change_client_key(self):
+        test_settings = replace(rate_limit.settings, trusted_proxy_cidrs=())
+        with patch.object(rate_limit, "settings", test_settings):
+            direct = rate_limit.client_key(self._request("198.51.100.10"))
+            spoofed = rate_limit.client_key(
+                self._request("198.51.100.10", "203.0.113.99")
+            )
+        self.assertEqual(spoofed, direct)
+
+    def test_trusted_proxy_chain_resolves_first_untrusted_address(self):
+        test_settings = replace(rate_limit.settings, trusted_proxy_cidrs=("10.0.0.0/8",))
+        with patch.object(rate_limit, "settings", test_settings):
+            forwarded = rate_limit.client_key(
+                self._request("10.0.0.2", "203.0.113.99, 198.51.100.20, 10.0.0.3")
+            )
+            direct = rate_limit.client_key(self._request("198.51.100.20"))
+        self.assertEqual(forwarded, direct)
 
 
 class RateLimitMiddlewareTests(unittest.TestCase):

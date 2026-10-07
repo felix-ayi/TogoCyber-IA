@@ -9,11 +9,16 @@ FastAPI (backend/app/main.py, /api/v1)
    ├── /network/analyze ── canonical features ── sklearn Pipeline ── SHAP
    ├── /phishing/analyze ─ TF-IDF Pipeline ──────────────── LIME
    ├── /url/analyze ────── URL syntax/structure checks (no DNS, HTTP fetch, or persistence)
+        ├── /events/ingest/suricata ─ EVE JSON → normalized event → SQLite (manual POST)
    ├── /assistant/ask ─── OpenAI HTTPS (optional, no fallback)
    ├── Risk Engine ────── probability → bounded score/severity/recommendations
    ├── /history ───────── SQLite (per-user result/model metadata, TTL ≤ 30 days)
    └── /incidents ─────── SQLite (high-risk queue, role-scoped status workflow/audit)
 ```
+
+L’ingestion Suricata est un premier adaptateur HTTP unitaire. Il ne collecte pas les
+journaux lui-même et son stockage n’alimente pas encore le moteur de règles, les
+alertes ou les corrélations.
 
 ## Schémas et dépendances
 
@@ -30,6 +35,13 @@ Les pipelines complets sont sérialisés avec joblib dans `models/artifacts/`; l
 ## SQLite
 
 `analysis_history` stocke exclusivement module, classe prédite, score de confiance, niveau, identifiant utilisateur, score de risque, sévérité, identifiant/version de modèle et date. Le texte et les caractéristiques de flux ne sont jamais persistés. L'ajout de colonnes est une migration additive exécutée au démarrage ; les lignes préexistantes restent conservées sans propriétaire et sans valeurs ML antérieures, et ne sont visibles que dans les vues Admin/Analyst. Purge des entrées âgées au plus tard lors de l’initialisation et des analyses. Le fichier peut être déplacé via `TOGOCYBER_DB_PATH`.
+
+`events` stocke les événements Suricata normalisés et leur EVE JSON brut (64 KiB
+maximum par événement). `event_id` est une empreinte SHA-256 canonique et clé
+primaire, ce qui rend le dépôt idempotent. Les événements sont consultables par les
+rôles Analyst/Admin et supprimés selon `RETENTION_DAYS`, au démarrage et lors
+d’une nouvelle ingestion. La purge utilise l’heure d’ingestion, non l’horodatage
+fourni par la source.
 
 `users`, `auth_sessions` et `auth_login_attempts` conservent les comptes, les identifiants de session hachés et des empreintes d'identifiants clients pour limiter les échecs de connexion. Aucun mot de passe, jeton Bearer ou adresse IP brute n'est écrit dans ces tables.
 

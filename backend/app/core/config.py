@@ -1,6 +1,7 @@
 """Environment-backed configuration without requiring secrets in source control."""
 
 from dataclasses import dataclass
+import ipaddress
 import os
 from pathlib import Path
 import secrets
@@ -46,6 +47,11 @@ class Settings:
     )
     retention_days: int = int(os.getenv("RETENTION_DAYS", "30"))
     rate_limit_per_minute: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "0"))
+    trusted_proxy_cidrs: tuple[str, ...] = tuple(
+        cidr.strip()
+        for cidr in os.getenv("TRUSTED_PROXY_CIDRS", "").split(",")
+        if cidr.strip()
+    )
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     auth_secret_key: str = os.getenv("AUTH_SECRET_KEY") or secrets.token_urlsafe(48)
@@ -60,6 +66,11 @@ class Settings:
             raise ValueError("RETENTION_DAYS must be between 1 and 30")
         if self.rate_limit_per_minute < 0:
             raise ValueError("RATE_LIMIT_PER_MINUTE must be 0 (disabled) or a positive integer")
+        for cidr in self.trusted_proxy_cidrs:
+            try:
+                ipaddress.ip_network(cidr, strict=False)
+            except ValueError as exc:
+                raise ValueError(f"Invalid TRUSTED_PROXY_CIDRS entry: {cidr!r}") from exc
         if os.getenv("AUTH_SECRET_KEY") and len(self.auth_secret_key) < 32:
             raise ValueError("AUTH_SECRET_KEY must contain at least 32 characters")
         if bool(self.bootstrap_admin_email) != bool(self.bootstrap_admin_password):

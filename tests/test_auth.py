@@ -2,13 +2,18 @@ import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from backend.app.api.v1.routes import auth as auth_routes
+from backend.app.core.auth import get_current_user
+from backend.app.core import rate_limit
 from backend.app.core.config import settings
 from backend.app.main import app
 from backend.app.repositories import audit_repository, auth_repository, history_repository
+from backend.app.schemas.auth import CredentialsRequest
 from backend.app.services import auth_service
 
 
@@ -262,6 +267,30 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(network.status_code, 200)
         self.assertEqual(network.json()["severity"], "CRITICAL")
 
+    def test_login_lockout_uses_trusted_proxy_client_identity(self):
+        request = SimpleNamespace(
+            client=SimpleNamespace(host="10.0.0.2"),
+            headers={"x-forwarded-for": "203.0.113.25"},
+        )
+        proxy_settings = replace(
+            self.test_settings, trusted_proxy_cidrs=("10.0.0.0/8",)
+        )
+        credentials = CredentialsRequest(
+            email="victim@example.org", password="incorrect-password"
+        )
+        with (
+            patch.object(rate_limit, "settings", proxy_settings),
+            patch.object(
+                auth_routes, "authenticate", return_value={"user": {"id": 1}}
+            ) as authenticate,
+            patch.object(auth_routes, "record_audit_event"),
+        ):
+            client_identifier = rate_limit.client_key(request)
+            auth_routes.login(credentials, request)
+            authenticate.assert_called_once_with(
+                credentials.email, credentials.password, client_identifier
+            )
+
     def test_failed_login_is_rate_limited(self):
         for _ in range(auth_service.MAX_LOGIN_FAILURES):
             response = self.client.post(
@@ -368,6 +397,32 @@ class AuthenticationTests(unittest.TestCase):
         self.assertNotEqual(stored["password_hash"], "@Azerty1234")
         self.assertTrue(stored["password_hash"].startswith("pbkdf2_sha256$"))
 
+    def test_rejected_combined_self_deactivation_does_not_partially_change_role(self):
+        admin = auth_repository.create_user(
+            "admin@example.org",
+            auth_service._password_hash("a-long-admin-passphrase"),
+            "Admin",
+        )
+        auth_repository.create_user(
+            "second-admin@example.org",
+            auth_service._password_hash("a-long-second-admin-passphrase"),
+            "Admin",
+        )
+        headers = {
+            "Authorization": f"Bearer {auth_service._issue_token(admin)['access_token']}"
+        }
+
+        response = self.client.patch(
+            f"/api/v1/auth/users/{admin['id']}",
+            headers=headers,
+            json={"role": "Analyst", "is_active": False},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        updated = auth_repository.get_user_by_id(admin["id"])
+        self.assertEqual(updated["role"], "Admin")
+        self.assertTrue(updated["is_active"])
+
     def test_admin_can_manage_users_and_lockout_guards_are_enforced(self):
         admin = auth_repository.create_user(
             "admin@example.org",
@@ -470,6 +525,30 @@ class AuthenticationTests(unittest.TestCase):
             403,
         )
         self.assertEqual(self.client.delete(f"/api/v1/auth/users/{user['id']}", headers=headers).status_code, 403)
+
+    def test_unimplemented_role_names_do_not_gain_admin_or_soc_permissions(self):
+        for role in (
+            "ADMIN",
+            "SUPER_ADMIN",
+            "SOC_ANALYST",
+            "THREAT_HUNTER",
+            "AUDITOR",
+            "VIEWER",
+        ):
+            with self.subTest(role=role):
+                app.dependency_overrides[get_current_user] = lambda role=role: {
+                    "id": 42,
+                    "email": "role-check@example.org",
+                    "role": role,
+                    "is_active": True,
+                }
+                try:
+                    users = self.client.get("/api/v1/auth/users")
+                    alerts = self.client.get("/api/v1/alerts")
+                finally:
+                    app.dependency_overrides.pop(get_current_user, None)
+                self.assertEqual(users.status_code, 403)
+                self.assertEqual(alerts.status_code, 403)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,8 @@ Le dashboard fournit aussi des recommandations générales de prévention adapt�
 
 L’inspection d’URL examine localement sa structure uniquement : elle ne visite pas l’adresse, n’effectue aucune résolution DNS et ne contacte pas de service de réputation externe. L’URL fournie n’est ni enregistrée dans l’historique ni incluse dans un journal par ce service.
 
+Les événements fournis manuellement à l’endpoint d’ingestion Suricata sont conservés dans SQLite sous forme normalisée **et** avec le `raw_event` EVE d’origine (maximum 64 KiB). Les rôles `Analyst` et `Admin` peuvent les consulter via l’API. Les événements expirent selon `RETENTION_DAYS` (30 jours par défaut); la purge s’exécute au démarrage et lors d’une ingestion. Ne transmettre que des journaux autorisés, minimisés et dépourvus de secrets ou de données personnelles inutiles.
+
 ## Historique et conservation
 
 SQLite contient le module, la prédiction, le score et niveau de confiance, l'identifiant interne du compte propriétaire et l'horodatage. Les entrées expirent au plus tard 30 jours après l'analyse ; purge à l'initialisation et lors de chaque enregistrement. Le fichier se trouve à `TOGOCYBER_DB_PATH` (par défaut `database/togocyber.sqlite3`). L'administrateur peut effacer l'historique en supprimant le fichier de base de données lorsque l'application est arrêtée.

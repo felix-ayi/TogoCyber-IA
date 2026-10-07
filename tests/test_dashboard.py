@@ -1,13 +1,80 @@
 import unittest
 import json
 from datetime import datetime, timezone
+from unittest.mock import patch
 
+from frontend.components import export_button
 from frontend.services.analysis_report import build_analysis_report
 from frontend.services.response_guidance import get_action_guidance
+from frontend.views import authentication
 from frontend.views.home import _comparison_rows
+from frontend.components.sidebar import pages_for_role
 
 
 class DashboardTests(unittest.TestCase):
+    def test_navigation_grants_only_the_existing_role_capabilities(self):
+        admin_pages = pages_for_role("Admin")
+        analyst_pages = pages_for_role("Analyst")
+        user_pages = pages_for_role("User")
+
+        self.assertIn("Gestion des utilisateurs", admin_pages)
+        self.assertIn("Tableau de bord SOC", analyst_pages)
+        self.assertNotIn("Gestion des utilisateurs", analyst_pages)
+        self.assertIn("Incidents", user_pages)
+        self.assertNotIn("Alertes (SOC)", user_pages)
+
+        for unsupported_role in ("ADMIN", "SUPER_ADMIN", "SOC_ANALYST", "THREAT_HUNTER", "AUDITOR", "VIEWER"):
+            pages = pages_for_role(unsupported_role)
+            self.assertNotIn("Gestion des utilisateurs", pages)
+            self.assertNotIn("Tableau de bord SOC", pages)
+
+    def test_auth_mode_shows_clear_sign_in_and_sign_up_labels(self):
+        with (
+            patch.object(authentication.st, "container"),
+            patch.object(authentication.st, "title"),
+            patch.object(authentication.st, "caption"),
+            patch.object(
+                authentication.st, "segmented_control", return_value="Se connecter"
+            ) as mode_control,
+            patch.object(authentication, "_render_sign_in") as sign_in,
+            patch.object(authentication, "_render_sign_up") as sign_up,
+        ):
+            authentication.render()
+
+        mode_control.assert_called_once_with(
+            "Mode de connexion",
+            options=["Se connecter", "Créer un compte"],
+            default="Se connecter",
+            label_visibility="collapsed",
+            key="auth_mode",
+            width="stretch",
+        )
+        sign_in.assert_called_once()
+        sign_up.assert_not_called()
+
+    def test_csv_export_is_not_fetched_before_user_requests_it(self):
+        with (
+            patch.object(export_button.st, "button", return_value=False) as button,
+            patch.object(export_button, "download_export") as download,
+        ):
+            export_button.render_export_button("alerts")
+
+        button.assert_called_once()
+        download.assert_not_called()
+
+    def test_csv_export_is_fetched_and_offered_after_user_requests_it(self):
+        with (
+            patch.object(export_button.st, "button", return_value=True),
+            patch.object(
+                export_button, "download_export", return_value=("alerts.csv", b"id\n1\n")
+            ) as download,
+            patch.object(export_button.st, "download_button") as download_button,
+        ):
+            export_button.render_export_button("alerts")
+
+        download.assert_called_once_with("alerts", None)
+        download_button.assert_called_once()
+
     def test_guidance_is_cautious_and_contextual_for_each_prediction(self):
         phishing_guidance = get_action_guidance("phishing", "phishing")
         safe_text_guidance = get_action_guidance("phishing", "legitimate")

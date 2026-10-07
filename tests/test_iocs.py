@@ -165,6 +165,8 @@ class IocTests(unittest.TestCase):
             f"/api/v1/iocs/{ioc_id}/tags/botnet", headers=self.analyst_headers
         )
         self.assertEqual(removed.json()["tags"], [])
+        actions = {event["action"] for event in audit_repository.list_events(limit=100)}
+        self.assertTrue({"ioc.tag_added", "ioc.tag_removed"} <= actions)
 
     def test_lookup_returns_active_matches_only_and_reports_no_external_sources(self):
         self._create(type="ip", value="10.0.0.1", severity="HIGH")

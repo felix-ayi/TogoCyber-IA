@@ -8,8 +8,10 @@ for a true global limit. The limiter is disabled unless RATE_LIMIT_PER_MINUTE > 
 """
 
 from collections import deque
+from functools import lru_cache
 import hashlib
 import hmac
+import ipaddress
 import threading
 import time
 
@@ -61,19 +63,35 @@ class SlidingWindowRateLimiter:
                 del self._hits[key]
 
 
+@lru_cache(maxsize=8)
+def _trusted_proxy_networks(cidrs: tuple[str, ...]) -> tuple:
+    return tuple(ipaddress.ip_network(cidr, strict=False) for cidr in cidrs)
+
+
 def client_key(request) -> str:
     """Stable, non-reversible per-client key.
 
     The raw address is never retained — only an HMAC of it under the auth secret — so
-    the limiter's memory cannot leak client IPs. Behind a reverse proxy the first
-    X-Forwarded-For hop is used; the proxy MUST overwrite (not append) that header or
-    strip client-supplied values, otherwise a caller could rotate it to evade limits.
+    the limiter's memory cannot leak client IPs. Forwarded addresses are considered
+    only when the direct peer belongs to a configured trusted proxy network.
     """
+    host = request.client.host if request.client else "unknown"
     forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        host = forwarded.split(",")[0].strip()
-    else:
-        host = request.client.host if request.client else "unknown"
+    networks = _trusted_proxy_networks(settings.trusted_proxy_cidrs)
+    try:
+        peer = ipaddress.ip_address(host)
+    except ValueError:
+        peer = None
+    if forwarded and peer is not None and any(peer in network for network in networks):
+        forwarded_hosts = [item.strip() for item in forwarded.split(",")]
+        for forwarded_host in reversed(forwarded_hosts):
+            try:
+                address = ipaddress.ip_address(forwarded_host)
+            except ValueError:
+                break
+            if not any(address in network for network in networks):
+                host = address.compressed
+                break
     return hmac.new(
         settings.auth_secret_key.encode("utf-8"), host.encode("utf-8"), hashlib.sha256
     ).hexdigest()

@@ -12,15 +12,19 @@ def render_export_button(
     params: dict | None = None,
     key: str | None = None,
 ) -> None:
+    button_key = key or f"export_{resource}"
+    if not st.button(label, key=f"{button_key}_prepare"):
+        return
+
     try:
         filename, content = download_export(resource, params)
     except APIError as exc:
         render_error(str(exc))
         return
     st.download_button(
-        label,
+        "Télécharger le CSV",
         data=content,
         file_name=filename,
         mime="text/csv",
-        key=key or f"export_{resource}",
+        key=f"{button_key}_download",
     )

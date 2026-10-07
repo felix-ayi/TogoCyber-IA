@@ -7,5 +7,6 @@
 - **Déséquilibre.** Un jeu déséquilibré peut masquer des erreurs ; examiner précision/rappel par classe, matrice de confusion, coût des erreurs et seuils avant tout usage réel.
 - **Explications locales.** SHAP/LIME sont des approximations d’un modèle, variables selon l’exemple ; aucune causalité ou garantie.
 - **Assistant externe.** Latence, coût et disponibilité du modèle OpenAI dépendent du fournisseur et de sa configuration. Le code utilise timeout réseau et erreurs explicites ; les requêtes ne sont pas stockées localement.
-- **Produit.** Prototype sans authentification API, multi-tenant, surveillance, garanties de disponibilité ou audit indépendant. CORS n’est pas un contrôle d’accès.
+- **Ingestion événementielle limitée.** Un objet Suricata EVE peut être soumis manuellement à l’API et conservé dans SQLite. Aucun collecteur/tail de fichier n’est lancé; ces événements ne sont pas encore évalués par les règles de corrélation et ne créent pas d’alertes/incidents.
+- **Produit.** Prototype avec authentification Bearer et rôles `Admin`/`Analyst`/`User`, mais sans isolation multi-tenant, supervision, garanties de disponibilité ni audit indépendant. L’analyse URL est heuristique et locale, sans réputation externe. CORS n’est pas un contrôle d’accès.
 - **Éthique.** Analyser uniquement les messages et flux autorisés. Aucun scan actif n’est proposé. L’outil n’est pas adapté aux informations secrètes/confidentielles ni aux décisions critiques.

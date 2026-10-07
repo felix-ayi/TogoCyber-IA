@@ -14,6 +14,10 @@ class DuplicateUserError(ValueError):
     """An account already exists for the normalized email address."""
 
 
+class LastAdminError(RuntimeError):
+    """The update would leave the platform without an active administrator."""
+
+
 def _connect() -> sqlite3.Connection:
     settings.database_path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(settings.database_path, timeout=10)
@@ -118,6 +122,47 @@ def set_user_active(user_id: int, is_active: bool) -> dict | None:
                 (int(time.time()), user_id),
             )
     return get_user_by_id(user_id)
+
+
+def update_user_account(user_id: int, role: str, is_active: bool) -> dict | None:
+    with _connection() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        current = connection.execute(
+            "SELECT role, is_active FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if current is None:
+            return None
+        if (
+            current["role"] == "Admin"
+            and current["is_active"]
+            and (role != "Admin" or not is_active)
+        ):
+            active_admins = int(
+                connection.execute(
+                    "SELECT COUNT(*) AS c FROM users "
+                    "WHERE role = 'Admin' AND is_active = 1 AND id != ?",
+                    (user_id,),
+                ).fetchone()["c"]
+            )
+            if active_admins < 1:
+                raise LastAdminError(
+                    "Impossible de modifier le dernier administrateur actif."
+                )
+        connection.execute(
+            "UPDATE users SET role = ?, is_active = ? WHERE id = ?",
+            (role, 1 if is_active else 0, user_id),
+        )
+        if not is_active:
+            connection.execute(
+                "UPDATE auth_sessions SET revoked_at = ? "
+                "WHERE user_id = ? AND revoked_at IS NULL",
+                (int(time.time()), user_id),
+            )
+        row = connection.execute(
+            "SELECT id, email, role, is_active, created_at FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+    return {**dict(row), "is_active": bool(row["is_active"])}
 
 
 def replace_password_hash(user_id: int, password_hash: str) -> None:

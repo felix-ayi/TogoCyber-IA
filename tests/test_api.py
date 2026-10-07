@@ -8,6 +8,10 @@ class APIDocumentationTests(unittest.TestCase):
         paths = app.openapi()["paths"]
         expected = {
             "/api/v1/health",
+            "/api/v1/health/live",
+            "/api/v1/health/ready",
+            "/api/v1/events",
+            "/api/v1/events/ingest/suricata",
             "/api/v1/network/analyze",
             "/api/v1/phishing/analyze",
             "/api/v1/assistant/ask",

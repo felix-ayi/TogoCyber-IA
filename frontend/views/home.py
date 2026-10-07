@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+from frontend.components.brand_identity import render_capabilities
 from frontend.components.error_state import render_error
 from frontend.components.result_card import render_result
 from frontend.services.api_client import APIError, analyze_phishing, get_health, get_history
@@ -160,11 +161,18 @@ def _render_model_comparisons(details: dict) -> None:
 
 
 def render() -> None:
-    st.markdown("## Votre espace de vigilance")
-    st.write(
-        "Vérifiez un message suspect, consultez les alertes récentes et accédez "
-        "aux outils d’analyse depuis un seul endroit."
+    st.markdown(
+        '<section class="tc-home-intro">'
+        '<p class="tc-home-kicker">PLATEFORME INTELLIGENTE DE CYBERSÉCURITÉ</p>'
+        '<h2>Protégez vos systèmes contre les menaces numériques.</h2>'
+        '<p>Détection · Analyse · Protection contre les menaces informatiques</p>'
+        '<small>Une solution orientée cybersécurité pour la détection et l’analyse des menaces numériques.</small>'
+        '</section>',
+        unsafe_allow_html=True,
     )
+    render_capabilities()
+    st.markdown("### Votre espace de vigilance")
+    st.caption("Vérifiez un message suspect, suivez les analyses et accédez aux outils SOC selon votre rôle.")
 
     try:
         items = get_history()

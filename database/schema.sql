@@ -37,6 +37,28 @@ CREATE TABLE IF NOT EXISTS analysis_history (
 );
 CREATE INDEX IF NOT EXISTS idx_analysis_history_created_at
     ON analysis_history(created_at DESC);
+CREATE TABLE IF NOT EXISTS events (
+    event_id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    source TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    host TEXT,
+    user TEXT,
+    src_ip TEXT,
+    dst_ip TEXT,
+    src_port INTEGER CHECK (src_port BETWEEN 0 AND 65535),
+    dst_port INTEGER CHECK (dst_port BETWEEN 0 AND 65535),
+    protocol TEXT,
+    event_type TEXT NOT NULL,
+    severity TEXT NOT NULL CHECK (severity IN ('INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+    message TEXT,
+    raw_event TEXT NOT NULL,
+    metadata TEXT NOT NULL,
+    ingested_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_events_source_type_timestamp ON events(source_type, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_events_severity_timestamp ON events(severity, timestamp DESC);
 CREATE TABLE IF NOT EXISTS incidents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     history_id INTEGER UNIQUE REFERENCES analysis_history(id) ON DELETE SET NULL,
@@ -221,13 +243,19 @@ CREATE TABLE IF NOT EXISTS audit_events (
         'incident.status_changed',
         'alert.status_changed',
         'alert.assigned',
+        'alert.comment_added',
+        'alert.tag_added',
+        'alert.tag_removed',
         'ioc.created',
         'ioc.updated',
         'ioc.deleted',
+        'ioc.tag_added',
+        'ioc.tag_removed',
         'rule.created',
         'rule.updated',
         'rule.deleted',
         'correlation.run',
+        'notification.dispatch',
         'playbook.created',
         'playbook.updated',
         'playbook.deleted'

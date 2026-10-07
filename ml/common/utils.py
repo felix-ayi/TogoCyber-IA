@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,14 @@ def load_model(name: str) -> Any:
         raise FileNotFoundError(
             f"Le modèle '{name}' n'est pas entraîné. Fournissez le jeu de données réel puis lancez l'entraînement correspondant."
         )
+    signature = path.stat()
+    return _load_model_cached(
+        str(path.resolve()), signature.st_mtime_ns, signature.st_size
+    )
+
+
+@lru_cache(maxsize=8)
+def _load_model_cached(path: str, modified_ns: int, size: int) -> Any:
     return joblib.load(path)
 
 

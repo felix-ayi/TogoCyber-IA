@@ -1,35 +1,70 @@
-﻿from fastapi import APIRouter
+﻿import logging
+
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 from backend.app.core.config import settings
 from backend.app.repositories import history_repository, notification_repository
 from backend.app.services import integrations_service
-from ml.common.utils import MODELS_DIR, registered_model_metadata
+from ml.common.utils import load_model, registered_model_metadata
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _model_status(name: str) -> tuple[bool, dict]:
+    try:
+        load_model(name)
+        metadata = registered_model_metadata(name)
+    except FileNotFoundError:
+        return False, {}
+    except Exception:
+        logger.exception("Model readiness check failed for %s", name)
+        return False, {}
+    return True, metadata
+
+
+@router.get("/health/live")
+def liveness_check():
+    return {"status": "alive"}
+
+
+@router.get("/health/ready")
+def readiness_check():
+    checks = _dependency_checks()
+    models = {
+        name: _model_status(name)[0] for name in ("network", "phishing")
+    }
+    ready = checks["database"] == "ok"
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={
+            "status": "ready" if ready else "not_ready",
+            "checks": checks,
+            "models": models,
+        },
+    )
+
 
 @router.get("/health")
 def health_check():
-    models = {
-        "network": (MODELS_DIR / "network.joblib").is_file(),
-        "phishing": (MODELS_DIR / "phishing.joblib").is_file(),
-    }
+    models = {}
     model_details = {}
-    if models["network"]:
-        metadata = registered_model_metadata("network")
-        model_details["network"] = {
+    for name in ("network", "phishing"):
+        models[name], metadata = _model_status(name)
+        if not models[name]:
+            continue
+        model_details[name] = {
             "algorithm": metadata.get("model", "inconnu"),
-            "source": metadata.get("training_dataset", "source inconnue"),
-            "test_dataset": metadata.get("test_dataset", "inconnu"),
-            "test_rows": metadata.get("test_rows"),
-            "metrics": metadata.get("metrics", {}),
-            "comparison_metrics": metadata.get("comparison_metrics", {}),
-        }
-    if models["phishing"]:
-        metadata = registered_model_metadata("phishing")
-        model_details["phishing"] = {
-            "algorithm": metadata.get("model", "inconnu"),
-            "source": metadata.get("training_corpus", "source inconnue"),
-            "test_dataset": "partition de test réservée",
+            "source": metadata.get(
+                "training_dataset" if name == "network" else "training_corpus",
+                "source inconnue",
+            ),
+            "test_dataset": (
+                metadata.get("test_dataset", "inconnu")
+                if name == "network"
+                else "partition de test réservée"
+            ),
             "test_rows": metadata.get("test_rows"),
             "metrics": metadata.get("metrics", {}),
             "comparison_metrics": metadata.get("comparison_metrics", {}),

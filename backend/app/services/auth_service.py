@@ -11,6 +11,7 @@ import time
 
 from backend.app.core.config import settings
 from backend.app.repositories import auth_repository
+from backend.app.repositories.auth_repository import LastAdminError
 
 TOKEN_LIFETIME_SECONDS = 30 * 60
 LOGIN_WINDOW_SECONDS = 15 * 60
@@ -29,10 +30,6 @@ class LoginRateLimited(RuntimeError):
 
 class UserNotFoundError(LookupError):
     """The requested account does not exist."""
-
-
-class LastAdminError(RuntimeError):
-    """The operation would leave the platform without an active administrator."""
 
 
 class SelfActionError(RuntimeError):
@@ -118,26 +115,23 @@ def update_managed_user(
     if role is not None and role not in {"Admin", "Analyst", "User"}:
         raise ValueError("Rôle invalide.")
     actions: list[str] = []
+    updated_role = target["role"] if role is None else role
+    updated_is_active = bool(target["is_active"]) if is_active is None else is_active
 
-    if role is not None and role != target["role"]:
-        if target["role"] == "Admin" and target["is_active"] and role != "Admin":
-            if auth_repository.count_active_admins(exclude_user_id=user_id) < 1:
-                raise LastAdminError("Impossible de retirer le dernier administrateur actif.")
-        auth_repository.update_user_role(user_id, role)
+    if user_id == actor_id and target["is_active"] and not updated_is_active:
+        raise SelfActionError("Vous ne pouvez pas désactiver votre propre compte.")
+    if updated_role != target["role"]:
         actions.append("user.role_changed")
+    if updated_is_active != bool(target["is_active"]):
+        actions.append("user.activated" if updated_is_active else "user.deactivated")
+    if not actions:
+        return target, actions
 
-    current = auth_repository.get_user_by_id(user_id) or target
-    if is_active is not None and bool(is_active) != bool(current["is_active"]):
-        if not is_active:
-            if user_id == actor_id:
-                raise SelfActionError("Vous ne pouvez pas désactiver votre propre compte.")
-            if current["role"] == "Admin" and current["is_active"]:
-                if auth_repository.count_active_admins(exclude_user_id=user_id) < 1:
-                    raise LastAdminError("Impossible de désactiver le dernier administrateur actif.")
-        auth_repository.set_user_active(user_id, bool(is_active))
-        actions.append("user.activated" if is_active else "user.deactivated")
-
-    updated = get_managed_user(user_id)
+    updated = auth_repository.update_user_account(
+        user_id, updated_role, updated_is_active
+    )
+    if updated is None:
+        raise UserNotFoundError("Utilisateur introuvable.")
     return updated, actions
 
 

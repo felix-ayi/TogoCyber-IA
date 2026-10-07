@@ -98,6 +98,9 @@ class NotificationDispatchTests(unittest.TestCase):
         counts = notification_repository.counts()
         self.assertEqual(counts["not_configured"], 1)
         self.assertEqual(counts["sent"], 0)
+        event = audit_repository.list_events(limit=1, action="notification.dispatch")[0]
+        self.assertEqual(event["outcome"], "success")
+        self.assertEqual(event["actor_user_id"], self.analyst["id"])
 
     def test_webhook_delivery_marks_sent(self):
         with (
@@ -130,6 +133,9 @@ class NotificationDispatchTests(unittest.TestCase):
         counts = notification_repository.counts()
         self.assertEqual(counts["failed"], 1)
         self.assertEqual(counts["sent"], 0)
+        event = audit_repository.list_events(limit=1, action="notification.dispatch")[0]
+        self.assertEqual(event["outcome"], "failure")
+        self.assertEqual(event["actor_user_id"], self.analyst["id"])
 
     def test_invalid_webhook_url_is_not_used(self):
         # A non-HTTP(S) URL must never be dialed; falls back to "no channel".

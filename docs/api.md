@@ -10,7 +10,38 @@ Les analyses, l'assistant et l'historique exigent `Authorization: Bearer <token>
 
 ## Santé
 
-`GET /api/v1/health` renvoie la santé du serveur, la disponibilité des fichiers modèles (`models.network`, `models.phishing`) et l’état de configuration de l’assistant. `status=healthy` indique la disponibilité du serveur, pas la validité scientifique des modèles.
+`GET /api/v1/health` renvoie l’état du service, des modèles chargeables (`models.network`, `models.phishing`), leurs métriques enregistrées, l’assistant et les dépendances. `status=healthy` indique que l’API répond; un modèle absent ou illisible est signalé séparément comme indisponible.
+
+`GET /api/v1/health/live` est une sonde liveness légère, indépendante de SQLite et des modèles (`200`, `status=alive`). `GET /api/v1/health/ready` vérifie SQLite et rapporte séparément l’état des modèles; il renvoie `503`, `status=not_ready` si la base n’est pas disponible. Les modèles restent optionnels pour servir les autres routes; leurs analyses retournent `503` individuellement tant que le modèle correspondant n’est pas chargeable.
+
+## Ingestion d’événements
+
+Le premier adaptateur d’ingestion accepte un objet Suricata EVE JSON :
+
+`POST /api/v1/events/ingest/suricata` — rôle `Analyst` ou `Admin` requis.
+
+```json
+{
+  "event": {
+    "timestamp": "2026-10-06T09:00:00+00:00",
+    "event_type": "alert",
+    "src_ip": "198.51.100.12",
+    "src_port": 49152,
+    "dest_ip": "203.0.113.8",
+    "dest_port": 443,
+    "proto": "TCP",
+    "alert": {
+      "signature_id": 2100498,
+      "signature": "Suspicious TLS Certificate",
+      "severity": 1
+    }
+  }
+}
+```
+
+La réponse contient l’événement normalisé et `inserted`: `false` signale une empreinte de contenu déjà enregistrée. Les sévérités Suricata 1–4 sont mappées respectivement à `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`; les événements sans sévérité IDS sont `INFO`. `GET /api/v1/events?source_type=ids&severity=CRITICAL&limit=50&offset=0` liste les événements normalisés, avec pagination et filtres optionnels; l’accès est réservé aux rôles SOC.
+
+L’horodatage doit inclure un fuseau et est normalisé en UTC. Le `raw_event` doit être un objet JSON fini de 64 KiB maximum. Les données brutes et normalisées sont conservées dans SQLite, avec une purge selon `RETENTION_DAYS` (30 jours par défaut). Aucune alerte, corrélation ou incidence n’est encore créée à partir de ces événements. Le endpoint reçoit une soumission HTTP unitaire; il ne surveille pas le fichier EVE, n’écoute pas un socket et ne fournit pas encore de collecteur.
 
 ## Analyse réseau
 

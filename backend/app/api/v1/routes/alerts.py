@@ -153,11 +153,13 @@ def add_alert_comment(
     user: dict = Depends(_soc_roles),
 ):
     try:
-        return alert_repository.add_comment(alert_id, user["id"], request.body)
+        comment = alert_repository.add_comment(alert_id, user["id"], request.body)
     except alert_repository.AlertNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    record_audit_event("alert.comment_added", "success", user["id"], "alert", alert_id)
+    return comment
 
 
 @router.post("/{alert_id}/tags", response_model=AlertTagListResponse)
@@ -167,11 +169,13 @@ def add_alert_tag(
     user: dict = Depends(_soc_roles),
 ):
     try:
-        return {"tags": alert_repository.add_tag(alert_id, request.tag)}
+        tags = alert_repository.add_tag(alert_id, request.tag)
     except alert_repository.AlertNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    record_audit_event("alert.tag_added", "success", user["id"], "alert", alert_id)
+    return {"tags": tags}
 
 
 @router.delete("/{alert_id}/tags/{tag}", response_model=AlertTagListResponse)
@@ -181,8 +185,10 @@ def remove_alert_tag(
     user: dict = Depends(_soc_roles),
 ):
     try:
-        return {"tags": alert_repository.remove_tag(alert_id, tag)}
+        tags = alert_repository.remove_tag(alert_id, tag)
     except alert_repository.AlertNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    record_audit_event("alert.tag_removed", "success", user["id"], "alert", alert_id)
+    return {"tags": tags}

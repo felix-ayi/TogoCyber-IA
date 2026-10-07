@@ -16,7 +16,7 @@ from backend.app.repositories import (
     notification_repository,
     playbook_repository,
 )
-from backend.app.services import auth_service
+from backend.app.services import auth_service, integrations_service
 
 
 class SocOperationsTests(unittest.TestCase):
@@ -187,6 +187,33 @@ class SocOperationsTests(unittest.TestCase):
         virustotal = next(a for a in data["adapters"] if a["key"] == "virustotal")
         self.assertEqual(virustotal["status"], "configured")
         self.assertEqual(data["configured"], 1)
+
+    def test_smtp_integration_requires_a_complete_delivery_configuration(self):
+        with patch.dict(
+            "os.environ", {"NOTIFICATION_SMTP_HOST": "mail.example.org"}, clear=True
+        ):
+            smtp = next(
+                item
+                for item in integrations_service.integration_status()
+                if item["key"] == "smtp"
+            )
+        self.assertEqual(smtp["status"], "not_configured")
+
+        with patch.dict(
+            "os.environ",
+            {
+                "NOTIFICATION_SMTP_HOST": "mail.example.org",
+                "NOTIFICATION_SMTP_FROM": "alerts@example.org",
+                "NOTIFICATION_SMTP_TO": "soc@example.org",
+            },
+            clear=True,
+        ):
+            smtp = next(
+                item
+                for item in integrations_service.integration_status()
+                if item["key"] == "smtp"
+            )
+        self.assertEqual(smtp["status"], "configured")
 
 
 if __name__ == "__main__":

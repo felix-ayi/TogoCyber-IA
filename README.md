@@ -82,6 +82,10 @@ Puis ouvrir <http://localhost:8502>.
 
 Le contrat API réseau utilise les variables : `duration` (secondes), `src_bytes`, `dst_bytes`, `src_packets`, `dst_packets`, `src_port`, `dst_port`, `protocol_number` (TCP 6, UDP 17, ICMP 1), `flow_rate` (paquets/seconde). Cette projection commune facilite l’essai CIC→UNSW mais ne supprime pas le décalage de domaine ; les métriques cross-dataset doivent être interprétées prudemment.
 
+## Ingestion Suricata (premier connecteur)
+
+Un utilisateur `Analyst` ou `Admin` peut soumettre un objet EVE JSON à `POST /api/v1/events/ingest/suricata`. L’événement est validé, normalisé, stocké dans SQLite et dédoublonné par empreinte de contenu; les événements sont consultables via `GET /api/v1/events`. Cette API n’écoute pas un fichier ou socket Suricata, ne surveille pas de journal et ne transforme pas encore ces événements en alertes/incidents. Voir [docs/api.md](docs/api.md).
+
 ## Tests
 
 ```powershell
@@ -92,15 +96,33 @@ python -m pytest
 
 ## Base de données
 
-SQLite local (`database/togocyber.sqlite3`, ignoré par Git), initialisé de façon idempotente avec des migrations additives non destructives ; historique purgé après `RETENTION_DAYS`. La chaîne de connexion est centralisée via `DATABASE_URL` (seul `sqlite:///…` est câblé ; une URL `postgresql://…` est rejetée au démarrage tant que l’adaptateur Postgres n’existe pas). Outre l’authentification et l’historique, la base porte les tables SOC : alertes, incidents, IOC, règles de détection et corrélations, retours modèles, notifications et playbooks. Le schéma est documenté dans [docs/database.md](docs/database.md).
+SQLite local (`database/togocyber.sqlite3`, ignoré par Git), initialisé de façon idempotente avec des migrations additives non destructives ; historique et événements ingérés purgés selon `RETENTION_DAYS`. La chaîne de connexion est centralisée via `DATABASE_URL` (seul `sqlite:///…` est câblé ; une URL `postgresql://…` est rejetée au démarrage tant que l’adaptateur Postgres n’existe pas). Outre l’authentification et l’historique, la base porte les tables SOC : événements Suricata, alertes, incidents, IOC, règles de corrélation, retours modèles, notifications et playbooks. Le schéma est documenté dans [docs/database.md](docs/database.md).
 
 
 ## Confidentialité
 
-Le texte et les caractéristiques réseau ne sont pas conservés dans SQLite. L'historique garde le module, la classe prédite, la confiance, l'identifiant interne du propriétaire et l'horodatage, 30 jours maximum. L'assistant OpenAI ne fonctionne que si `OPENAI_API_KEY` est configurée ; son message est envoyé au fournisseur et soumis à ses conditions. Ne saisissez aucune information confidentielle.
+Le texte et les caractéristiques réseau des analyses unitaires ne sont pas conservés dans leur historique. Le pipeline Suricata conserve en revanche le `raw_event` EVE JSON et les champs normalisés dans `events`, accessibles aux rôles SOC et purgés selon `RETENTION_DAYS` (30 jours par défaut). Ne soumettez que des événements autorisés et minimisés. L'historique des analyses garde le module, la classe prédite, la confiance, l'identifiant interne du propriétaire et l'horodatage. L'assistant OpenAI ne fonctionne que si `OPENAI_API_KEY` est configurée ; son message est envoyé au fournisseur et soumis à ses conditions. Ne saisissez aucune information confidentielle.
 
 Pages de confidentialité, conditions d’utilisation, cookies, transparence et avertissements sont accessibles dans le menu du dashboard. Voir [docs/data_policy.md](docs/data_policy.md).
 
 ## Comptes et authentification
 
-L'API et le dashboard demandent une connexion. L'inscription publique crée des comptes `User` uniquement ; les analyses sont liées au compte et les utilisateurs ne voient que leur propre historique. Pour créer le premier administrateur, configurez `BOOTSTRAP_ADMIN_EMAIL` et `BOOTSTRAP_ADMIN_PASSWORD` dans `.env` avant le démarrage. Seul un administrateur peut ensuite créer des comptes `Analyst` ou `User`. Voir [docs/api.md](docs/api.md) et [docs/deployment.md](docs/deployment.md).
+L'API et le dashboard utilisent le même login backend : mot de passe haché PBKDF2-HMAC-SHA256, jeton Bearer signé valable 30 minutes, session révocable et permissions vérifiées côté API. L'inscription publique crée uniquement des comptes `User`; elle ne peut pas se donner des droits SOC ou Admin.
+
+### Créer le premier administrateur
+
+1. Copier `.env.example` vers `.env` : `Copy-Item .env.example .env` (PowerShell).
+2. Dans `.env`, définir `AUTH_SECRET_KEY` avec une valeur aléatoire d’au moins 32 caractères.
+3. Définir `BOOTSTRAP_ADMIN_EMAIL` et un `BOOTSTRAP_ADMIN_PASSWORD` unique et fort (minimum technique : 11 caractères; privilégier au moins 16).
+4. Démarrer l’API; au premier démarrage, elle crée ce compte une seule fois avec le rôle `Admin`.
+5. Ouvrir le dashboard et se connecter avec ces identifiants. Retirer ensuite les deux variables `BOOTSTRAP_ADMIN_*` de `.env`; le compte créé reste en base.
+
+Ne jamais mettre ces secrets dans le code, un dépôt Git, une capture ou un ticket. Si le compte Admin existe déjà, changer `BOOTSTRAP_ADMIN_PASSWORD` ne réinitialise pas son mot de passe; un Admin connecté peut réinitialiser les comptes gérés via l’interface/API.
+
+### Rôles existants
+
+- `Admin` : toutes les pages, dont SOC, audit et gestion des utilisateurs; peut créer des comptes `Analyst` et `User`.
+- `Analyst` : pages SOC et triage, sans audit ni gestion des utilisateurs.
+- `User` : outils d’analyse et accès à son propre historique/incidents; pas de file SOC.
+
+Les rôles `SUPER_ADMIN`, `SOC_ANALYST`, `THREAT_HUNTER`, `AUDITOR` et `VIEWER` ne sont pas implémentés. Le backend ne les accepte pas et les traite comme non autorisés; le menu seul n’accorde jamais de permissions. Voir [docs/api.md](docs/api.md) et [docs/deployment.md](docs/deployment.md).

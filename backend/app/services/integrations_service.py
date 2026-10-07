@@ -57,7 +57,11 @@ _ADAPTERS = [
         "key": "smtp",
         "name": "SMTP (e-mail)",
         "category": "notification",
-        "env": ["NOTIFICATION_SMTP_HOST"],
+        "env": [
+            "NOTIFICATION_SMTP_HOST",
+            "NOTIFICATION_SMTP_FROM",
+            "NOTIFICATION_SMTP_TO",
+        ],
         "detail": "Canal de notification par e-mail.",
     },
     {

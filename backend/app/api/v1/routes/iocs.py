@@ -119,18 +119,22 @@ def delete_ioc(ioc_id: int, user: dict = Depends(_soc_roles)):
 @router.post("/{ioc_id}/tags", response_model=IocTagListResponse)
 def add_ioc_tag(ioc_id: int, request: IocTagRequest, user: dict = Depends(_soc_roles)):
     try:
-        return {"tags": ioc_repository.add_tag(ioc_id, request.tag)}
+        tags = ioc_repository.add_tag(ioc_id, request.tag)
     except ioc_repository.IocNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    record_audit_event("ioc.tag_added", "success", user["id"], "ioc", ioc_id)
+    return {"tags": tags}
 
 
 @router.delete("/{ioc_id}/tags/{tag}", response_model=IocTagListResponse)
 def remove_ioc_tag(ioc_id: int, tag: str, user: dict = Depends(_soc_roles)):
     try:
-        return {"tags": ioc_repository.remove_tag(ioc_id, tag)}
+        tags = ioc_repository.remove_tag(ioc_id, tag)
     except ioc_repository.IocNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    record_audit_event("ioc.tag_removed", "success", user["id"], "ioc", ioc_id)
+    return {"tags": tags}

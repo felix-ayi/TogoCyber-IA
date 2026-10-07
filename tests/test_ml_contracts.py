@@ -1,13 +1,36 @@
 import unittest
+from pathlib import Path
+import tempfile
+from unittest.mock import patch
 
 import pandas as pd
 
 from backend.app.core.security import confidence_level
+from ml.common import utils as model_utils
 from ml.common.metrics import binary_metrics
 from ml.common.preprocessing import NETWORK_FEATURES, binary_labels, canonical_network_frame, network_features_from_mapping
 
 
 class MLContractTests(unittest.TestCase):
+    def test_model_loader_caches_artifact_and_reloads_when_it_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            artifact = Path(directory) / "network.joblib"
+            artifact.write_bytes(b"one")
+            with (
+                patch.object(model_utils, "MODELS_DIR", Path(directory)),
+                patch.object(model_utils.joblib, "load", side_effect=[object(), object()]) as load,
+            ):
+                first = model_utils.load_model("network")
+                second = model_utils.load_model("network")
+                self.assertIs(first, second)
+                self.assertEqual(load.call_count, 1)
+
+                artifact.write_bytes(b"replacement")
+                third = model_utils.load_model("network")
+
+            self.assertIsNot(first, third)
+            self.assertEqual(load.call_count, 2)
+
     def test_network_feature_order_and_finite_validation(self):
         values = {name: 1 for name in NETWORK_FEATURES}
         self.assertEqual(tuple(network_features_from_mapping(values).columns), NETWORK_FEATURES)

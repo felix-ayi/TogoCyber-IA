@@ -51,6 +51,28 @@ PAGE_ICONS = {
     "Cookies": "◌",
 }
 
+ADMIN_ONLY_PAGES = {"Audit de sécurité", "Gestion des utilisateurs"}
+SOC_PAGES = {
+    "Tableau de bord SOC",
+    "Alertes (SOC)",
+    "Recherche (SOC)",
+    "Threat Intel (IOC)",
+    "Corrélation & règles",
+    "Supervision ML",
+    "Playbooks",
+    "Intégrations & notifications",
+}
+
+
+def pages_for_role(role: str | None) -> list[str]:
+    if role == "Admin":
+        return PAGES.copy()
+    if role == "Analyst":
+        return [page for page in PAGES if page not in ADMIN_ONLY_PAGES]
+    return [
+        page for page in PAGES if page not in ADMIN_ONLY_PAGES and page not in SOC_PAGES
+    ]
+
 
 def select_page() -> str:
     with st.sidebar:
@@ -62,25 +84,7 @@ def select_page() -> str:
         st.caption("Prototype de recherche · N’entrez aucun secret ni donnée sensible.")
         user = st.session_state.get("auth_user", {})
         role = user.get("role")
-        admin_only_pages = {"Audit de sécurité", "Gestion des utilisateurs"}
-        soc_pages = {
-            "Tableau de bord SOC",
-            "Alertes (SOC)",
-            "Recherche (SOC)",
-            "Threat Intel (IOC)",
-            "Corrélation & règles",
-            "Supervision ML",
-            "Playbooks",
-            "Intégrations & notifications",
-        }
-        if role == "Admin":
-            visible_pages = PAGES
-        elif role == "Analyst":
-            visible_pages = [page for page in PAGES if page not in admin_only_pages]
-        else:
-            visible_pages = [
-                page for page in PAGES if page not in admin_only_pages and page not in soc_pages
-            ]
+        visible_pages = pages_for_role(role)
         if user:
             st.caption(f"Connecté : {user.get('email')} · rôle {user.get('role')}")
             if st.button("Se déconnecter", key="logout_button"):

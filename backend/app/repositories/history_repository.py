@@ -149,6 +149,7 @@ def purge_expired(now: datetime | None = None) -> int:
         # never purged here — they are the operational record of the SOC.
         connection.execute("DELETE FROM notifications WHERE created_at < ?", (cutoff_text,))
         connection.execute("DELETE FROM correlation_findings WHERE created_at < ?", (cutoff_text,))
+        connection.execute("DELETE FROM events WHERE ingested_at < ?", (cutoff_text,))
         return purged
 
 

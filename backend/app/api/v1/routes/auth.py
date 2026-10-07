@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.app.core.auth import get_current_user, require_roles
+from backend.app.core.rate_limit import client_key
 from backend.app.repositories.audit_repository import record_event as record_audit_event
 from backend.app.repositories.auth_repository import DuplicateUserError
 from backend.app.schemas.auth import (
@@ -51,7 +52,7 @@ def register(request: RegistrationRequest):
 
 @router.post("/login", response_model=AuthResponse)
 def login(request: CredentialsRequest, client_request: Request):
-    client_identifier = client_request.client.host if client_request.client else "unknown"
+    client_identifier = client_key(client_request)
     try:
         response = authenticate(request.email, request.password, client_identifier)
         record_audit_event(

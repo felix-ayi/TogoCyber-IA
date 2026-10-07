@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from backend.app.core.auth import require_roles
 from backend.app.repositories import notification_repository
+from backend.app.repositories.audit_repository import record_event as record_audit_event
 from backend.app.schemas.notifications import (
     NotificationCountsResponse,
     NotificationDispatchResponse,
@@ -44,6 +45,9 @@ def dispatch_notifications(
     # left untouched and reported honestly. No message is ever marked 'sent' without a
     # successful transport.
     try:
-        return notification_service.dispatch_outbox(limit=limit)
+        result = notification_service.dispatch_outbox(limit=limit)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    outcome = "failure" if result["failed"] else "success"
+    record_audit_event("notification.dispatch", outcome, user["id"])
+    return result

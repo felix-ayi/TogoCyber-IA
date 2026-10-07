@@ -204,6 +204,11 @@ class AlertTests(unittest.TestCase):
         self.assertEqual(removed.status_code, 200)
         self.assertEqual(removed.json()["tags"], [])
 
+        actions = {event["action"] for event in audit_repository.list_events(limit=100)}
+        self.assertTrue(
+            {"alert.comment_added", "alert.tag_added", "alert.tag_removed"} <= actions
+        )
+
     def test_list_filters_and_counts(self):
         self._raise_detection(severity="HIGH", risk_score=88, user_id=self.plain_user["id"])
         self._raise_detection(severity="MEDIUM", risk_score=55, module="network")

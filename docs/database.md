@@ -46,6 +46,7 @@ un gestionnaire de migrations avant tout changement de schéma destructif.
 | `auth_sessions` | Jetons révocables | `token_id_hash` (SHA-256 du `jti`), `expires_at`, `revoked_at` ; `ON DELETE CASCADE` depuis `users`. |
 | `auth_login_attempts` | Anti brute-force | `client_hash` + `attempted_at`, fenêtre glissante de 15 min, 5 échecs max. |
 | `analysis_history` | Historique des analyses | `module` ∈ `network`/`phishing`, prédiction, confiance, `risk_score`, `severity`, `model_name/version`, `user_id`. |
+| `events` | Événements normalisés ingérés | EVE Suricata soumis par API, hash SHA-256 déterministe comme clé, champs communs et `raw_event` JSON borné à 64 KiB, purge par `ingested_at` après `RETENTION_DAYS`. |
 | `incidents` | Incidents SOC | Créés automatiquement pour `severity` ∈ `HIGH`/`CRITICAL` rattachée à un utilisateur ; `status` ∈ `OPEN`/`ACKNOWLEDGED`/`RESOLVED`. |
 | `incident_status_events` | Journal des changements d’état | Historise chaque transition de statut d’un incident. |
 | `alerts` | File de triage SOC | Créées pour `severity` ∈ `MEDIUM`/`HIGH`/`CRITICAL` ; liées à la détection source et, le cas échéant, à l’incident. |
@@ -70,6 +71,8 @@ dans `incidents` (la contrainte `module` n’autorise que `network`/`phishing`).
 - `incidents.history_id` → `UNIQUE`, `ON DELETE SET NULL`.
 - `auth_sessions.user_id` et `incident_status_events.incident_id` → `ON DELETE CASCADE`.
 - Index sur `analysis_history(created_at DESC)`,
+  `events(timestamp DESC)`, `events(source_type, timestamp DESC)`,
+  `events(severity, timestamp DESC)`,
   `incidents(owner_user_id, status, created_at DESC)`,
   `incident_status_events(incident_id, id)` et `audit_events(created_at DESC, id DESC)`.
 
@@ -83,7 +86,9 @@ sont limitées à une liste fixe (voir `AUDIT_ACTIONS` dans
 (`incident.status_changed`, `alert.status_changed`, `alert.assigned`),
 indicateurs (`ioc.created/updated/deleted`), règles et corrélation
 (`rule.created/updated/deleted`, `correlation.run`) et playbooks
-(`playbook.created/updated/deleted`). `actor_user_id` n’a **pas** de clé
+(`notification.dispatch`, `playbook.created/updated/deleted`). Les commentaires et tags sont journalisés
+par ressource (`alert.comment_added`, `alert.tag_added/removed`,
+`ioc.tag_added/removed`) sans copier leur contenu dans l’audit. `actor_user_id` n’a **pas** de clé
 étrangère : la suppression d’un compte conserve ses lignes d’audit (traçabilité).
 Aucun mot de passe, jeton ni secret n’y est stocké.
 
@@ -100,11 +105,18 @@ le texte analysé ni les caractéristiques réseau brutes — uniquement des
 métadonnées de prédiction (module, classe, confiance, score, sévérité, modèle,
 horodatage, `user_id`).
 
+Exception explicite : les événements Suricata ingérés sont stockés comme
+événements opérationnels avec leur EVE JSON brut et leurs champs normalisés.
+L’accès API est limité aux Analyst/Admin; la purge utilise l’heure d’ingestion
+et `RETENTION_DAYS`.
+
 `purge_expired()` supprime les lignes plus anciennes que `RETENTION_DAYS` (1 à
 30 jours, 30 par défaut) dans `analysis_history` **et** dans les artefacts SOC
-éphémères : la file `notifications` et les `correlation_findings` (ces dernières
-entraînent en cascade `correlation_finding_alerts`). La purge s’exécute à
-l’initialisation et après chaque enregistrement.
+éphémères : événements (heure d’ingestion), file `notifications` et
+`correlation_findings` (ces dernières entraînent en cascade
+`correlation_finding_alerts`). La purge globale s’exécute à l’initialisation et
+après chaque analyse; l’ingestion exécute aussi la purge des événements avant
+chaque insertion.
 
 Ne sont **jamais** purgés automatiquement : `alerts`, `incidents`,
 `incident_status_events`, `alert_status_events`, `model_feedback` et

@@ -18,6 +18,7 @@ from backend.app.api.v1.routes.integrations import router as integrations_router
 from backend.app.api.v1.routes.exports import router as exports_router
 from backend.app.api.v1.routes.url_analysis import router as url_analysis_router
 from backend.app.api.v1.routes.audit import router as audit_router
+from backend.app.api.v1.routes.events import router as events_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -39,3 +40,4 @@ router.include_router(integrations_router)
 router.include_router(exports_router)
 router.include_router(url_analysis_router)
 router.include_router(audit_router)
+router.include_router(events_router)
