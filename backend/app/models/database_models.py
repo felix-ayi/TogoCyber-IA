@@ -25,6 +25,16 @@ CREATE TABLE IF NOT EXISTS auth_login_attempts (
 );
 CREATE INDEX IF NOT EXISTS idx_auth_login_attempts_client_time
     ON auth_login_attempts(client_hash, attempted_at);
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at INTEGER NOT NULL,
+    used_at INTEGER,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id
+    ON password_reset_tokens(user_id, expires_at);
 CREATE TABLE IF NOT EXISTS analysis_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     module TEXT NOT NULL CHECK (module IN ('network', 'phishing')),

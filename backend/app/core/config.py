@@ -57,6 +57,15 @@ class Settings:
     auth_secret_key: str = os.getenv("AUTH_SECRET_KEY") or secrets.token_urlsafe(48)
     bootstrap_admin_email: str = os.getenv("BOOTSTRAP_ADMIN_EMAIL", "").strip().lower()
     bootstrap_admin_password: str = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "")
+    password_reset_email_enabled: bool = str(os.getenv("SMTP_ENABLED", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    password_reset_sender_email: str = os.getenv(
+        "SMTP_FROM", os.getenv("NOTIFICATION_SMTP_FROM", "")
+    ).strip()
     allowed_origins: tuple[str, ...] = tuple(
         origin.strip() for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:8501").split(",") if origin.strip()
     )

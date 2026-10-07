@@ -334,6 +334,89 @@ class AuthenticationTests(unittest.TestCase):
         with self.assertRaises(auth_service.AuthenticationError):
             auth_service.authenticate_token(tampered_token)
 
+    def test_password_reset_flow_uses_single_use_tokens_and_revokes_sessions(self):
+        user = auth_repository.create_user(
+            "reset@example.org",
+            auth_service._password_hash("a-long-secure-passphrase"),
+            "User",
+        )
+        token = auth_service.request_password_reset("reset@example.org", "client-1")
+        self.assertTrue(token)
+
+        with self.assertRaises(auth_service.AuthenticationError):
+            auth_service.confirm_password_reset("reset@example.org", token + "tampered", "new-secure-passphrase")
+
+        auth_service.confirm_password_reset("reset@example.org", token, "new-secure-passphrase")
+        self.assertTrue(auth_service._verify_password("new-secure-passphrase", auth_repository.find_user_by_email("reset@example.org")["password_hash"]))
+
+        with self.assertRaises(auth_service.AuthenticationError):
+            auth_service.confirm_password_reset("reset@example.org", token, "another-secure-passphrase")
+
+    def test_password_reset_request_sends_token_only_by_email_and_is_non_enumerating(self):
+        auth_repository.create_user(
+            "reset@example.org",
+            auth_service._password_hash("a-long-secure-passphrase"),
+            "User",
+        )
+        enabled_settings = replace(self.test_settings, password_reset_email_enabled=True)
+        with (
+            patch.object(auth_routes, "settings", enabled_settings),
+            patch.object(auth_routes, "send_password_reset_email") as deliver_email,
+        ):
+            existing = self.client.post(
+                "/api/v1/auth/password/request", json={"email": "reset@example.org"}
+            )
+            self.assertEqual(existing.status_code, 200)
+            self.assertNotIn("token", existing.json())
+            deliver_email.assert_called_once()
+            self.assertEqual(deliver_email.call_args.args[0], "reset@example.org")
+            reset_token = deliver_email.call_args.args[1]
+            self.assertTrue(reset_token)
+
+            unknown = self.client.post(
+                "/api/v1/auth/password/request", json={"email": "unknown@example.org"}
+            )
+            self.assertEqual(unknown.status_code, 200)
+            self.assertEqual(unknown.json(), existing.json())
+            deliver_email.assert_called_once()
+
+    def test_password_reset_request_returns_demo_token_when_smtp_is_disabled(self):
+        auth_repository.create_user(
+            "demo-reset@example.org",
+            auth_service._password_hash("a-long-secure-passphrase"),
+            "User",
+        )
+        disabled_settings = replace(self.test_settings, password_reset_email_enabled=False)
+        with patch.object(auth_routes, "settings", disabled_settings):
+            response = self.client.post(
+                "/api/v1/auth/password/request",
+                json={"email": "demo-reset@example.org"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("demo_mode", response.json())
+        self.assertTrue(response.json()["demo_mode"])
+        self.assertTrue(response.json()["reset_token"])
+
+    def test_password_reset_request_returns_demo_token_when_email_delivery_fails(self):
+        auth_repository.create_user(
+            "smtp-failure@example.org",
+            auth_service._password_hash("a-long-secure-passphrase"),
+            "User",
+        )
+        enabled_settings = replace(self.test_settings, password_reset_email_enabled=True)
+        with (
+            patch.object(auth_routes, "settings", enabled_settings),
+            patch.object(auth_routes, "send_password_reset_email", side_effect=OSError("SMTP down")),
+        ):
+            response = self.client.post(
+                "/api/v1/auth/password/request",
+                json={"email": "smtp-failure@example.org"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("demo_mode", response.json())
+        self.assertTrue(response.json()["demo_mode"])
+        self.assertTrue(response.json()["reset_token"])
+
     def test_bootstrap_admin_is_created_once_without_password_reset(self):
         bootstrap_settings = replace(
             self.test_settings,

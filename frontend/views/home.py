@@ -8,11 +8,46 @@ import streamlit as st
 from frontend.components.brand_identity import render_capabilities
 from frontend.components.error_state import render_error
 from frontend.components.result_card import render_result
-from frontend.services.api_client import APIError, analyze_phishing, get_health, get_history
+from frontend.services.api_client import (
+    APIError,
+    analyze_phishing,
+    clear_history,
+    get_demo_scenario,
+    get_health,
+    get_history,
+    get_security_posture,
+)
 
 
 def _navigate(page: str) -> None:
     st.session_state["main_navigation"] = page
+
+
+def _inject_quick_action_style() -> None:
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stHorizontalBlock"] div.stButton > button {
+            background: linear-gradient(135deg, rgba(60, 95, 128, 0.90), rgba(46, 181, 168, 0.52));
+            border: 1px solid rgba(135, 207, 221, 0.42);
+            color: #edfaff;
+            border-radius: 18px;
+            min-height: 52px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            box-shadow: 0 14px 26px rgba(7, 19, 33, 0.22), inset 0 1px 0 rgba(255,255,255,0.18);
+            animation: tc-button-arrive 480ms ease-out both;
+        }
+        div[data-testid="stHorizontalBlock"] div.stButton > button:hover {
+            background: linear-gradient(135deg, rgba(62, 214, 196, 0.34), rgba(87, 126, 191, 0.34));
+            border-color: rgba(146, 255, 226, 0.72);
+            transform: translateY(-2px) scale(1.01);
+            box-shadow: 0 18px 32px rgba(7, 19, 33, 0.24), inset 0 1px 0 rgba(255,255,255,0.22);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _render_summary(items: list[dict]) -> None:
@@ -171,22 +206,376 @@ def render() -> None:
         unsafe_allow_html=True,
     )
     render_capabilities()
-    st.markdown("### Votre espace de vigilance")
-    st.caption("Vérifiez un message suspect, suivez les analyses et accédez aux outils SOC selon votre rôle.")
+    st.markdown(
+        """
+        <section class="tc-hero-cta" aria-label="Vue d’ensemble cyber">
+          <div class="tc-hero-cta-copy">
+            <span class="tc-hero-kicker">PULSE CYBER</span>
+            <h3>Surveillance proactive · Priorisation rapide · Réponse orientée risque</h3>
+          </div>
+          <div class="tc-hero-cta-meta">
+            <span>Démo</span>
+            <span>Sans donnée sensible</span>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
 
+    try:
+        health = get_health()
+    except APIError:
+        health = {}
+    try:
+        posture = get_security_posture()
+    except APIError:
+        posture = None
     try:
         items = get_history()
     except APIError as exc:
         items = []
         render_error(str(exc))
-    try:
-        model_details = get_health().get("model_details", {})
-    except APIError:
-        model_details = {}
+
+    network_ready = bool(health.get("models", {}).get("network"))
+    phishing_ready = bool(health.get("models", {}).get("phishing"))
+    assistant_ready = bool(health.get("assistant_configured"))
+    api_state = "OK" if health.get("status") == "healthy" else "Indisponible"
+    api_class = "tc-status-ok" if health.get("status") == "healthy" else "tc-status-warning"
+
+    st.markdown(
+        f"""
+        <section class="tc-status-overview" aria-label="État de la plateforme">
+          <div class="tc-status-header">
+            <span class="tc-status-live">LIVE</span>
+            <span class="tc-status-title">État de la plateforme</span>
+          </div>
+          <div class="tc-status-grid">
+            <div class="tc-status-card {api_class}">
+              <span class="tc-status-label">API</span>
+              <strong>{api_state}</strong>
+              <small>Service principal</small>
+            </div>
+            <div class="tc-status-card {'tc-status-ok' if network_ready else 'tc-status-warning'}">
+              <span class="tc-status-label">Réseau</span>
+              <strong>{'Prêt' if network_ready else 'À entraîner'}</strong>
+              <small>Détection comportementale</small>
+            </div>
+            <div class="tc-status-card {'tc-status-ok' if phishing_ready else 'tc-status-warning'}">
+              <span class="tc-status-label">Phishing</span>
+              <strong>{'Prêt' if phishing_ready else 'À entraîner'}</strong>
+              <small>Analyse du message</small>
+            </div>
+            <div class="tc-status-card {'tc-status-ok' if assistant_ready else 'tc-status-neutral'}">
+              <span class="tc-status-label">Assistant IA</span>
+              <strong>{'Oui' if assistant_ready else 'Non'}</strong>
+              <small>Outil d’assistance</small>
+            </div>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    mission_score = int(posture.get("overall_score", 0)) if posture else 0
+    mission_level = posture.get("level", "À définir") if posture else "À définir"
+    st.markdown(
+        f"""
+        <section class="tc-mission-board" aria-label="Mission opérationnelle du SOC">
+          <div class="tc-mission-head">
+            <span class="tc-mission-kicker">MISSION</span>
+            <strong>Console de surveillance opérationnelle</strong>
+          </div>
+          <div class="tc-mission-grid">
+            <article class="tc-mission-card">
+              <span>Risque global</span>
+              <strong>{mission_score}</strong>
+              <small>{mission_level}</small>
+            </article>
+            <article class="tc-mission-card">
+              <span>API</span>
+              <strong>{'OK' if health.get('status') == 'healthy' else 'HORS LIGNE'}</strong>
+              <small>Service principal</small>
+            </article>
+            <article class="tc-mission-card">
+              <span>Modèles</span>
+              <strong>{sum(1 for ready in health.get('models', {}).values() if ready)}</strong>
+              <small>Prêts pour la démo</small>
+            </article>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if posture:
+        score = int(posture.get("overall_score", 0))
+        level = posture.get("level", "non défini")
+        level_class = "tc-risk-ok" if score >= 70 else "tc-risk-watch" if score >= 45 else "tc-risk-alert"
+        st.markdown(
+            f"""
+            <section class="tc-risk-panel {level_class}" aria-label="Synthèse de vigilance">
+              <div class="tc-risk-header">
+                <span class="tc-risk-kicker">Synthèse</span>
+                <span class="tc-risk-pill">{level}</span>
+              </div>
+              <div class="tc-risk-body">
+                <div>
+                  <span class="tc-risk-caption">Risque global</span>
+                  <strong class="tc-risk-score">{score}/100</strong>
+                </div>
+                <p class="tc-risk-summary">{posture.get('summary', 'État de sécurité non disponible.')}</p>
+              </div>
+            </section>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    network_items = [item for item in items if item.get("module") == "network"]
+    suspicious = [item for item in items if item.get("prediction") in {"malicious", "phishing"}]
+    st.markdown(
+        f"""
+        <section class="tc-ops-strip" aria-label="Synthèse des opérations SOC">
+          <article class="tc-ops-card">
+            <span class="tc-ops-label">Analyses enregistrées</span>
+            <strong>{len(items)}</strong>
+            <small>Historique local</small>
+          </article>
+          <article class="tc-ops-card">
+            <span class="tc-ops-label">Signalements</span>
+            <strong>{len(suspicious)}</strong>
+            <small>Malveillances détectées</small>
+          </article>
+          <article class="tc-ops-card">
+            <span class="tc-ops-label">Flux réseau</span>
+            <strong>{len(network_items)}</strong>
+            <small>Éléments observés</small>
+          </article>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <section class="tc-soc-workflow" aria-label="Cycle de réponse SOC">
+          <div class="tc-workflow-header">
+            <span>Cycle de réponse</span>
+            <small>Détection · Priorisation · Remédiation</small>
+          </div>
+          <div class="tc-workflow-grid">
+            <article class="tc-workflow-step">
+              <span class="tc-step-index">01</span>
+              <strong>Détection</strong>
+              <small>Signalisation des anomalies et des comportements suspects.</small>
+            </article>
+            <article class="tc-workflow-step">
+              <span class="tc-step-index">02</span>
+              <strong>Priorisation</strong>
+              <small>Analyse du niveau de risque et des actifs impactés.</small>
+            </article>
+            <article class="tc-workflow-step">
+              <span class="tc-step-index">03</span>
+              <strong>Remédiation</strong>
+              <small>Suivi des actions et mise à jour de la posture de sécurité.</small>
+            </article>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <section class="tc-transparency-panel" aria-label="Transparence de la démonstration">
+          <div class="tc-transparency-head">
+            <span>Transparence</span>
+            <small>Données synthétiques · limites explicites</small>
+          </div>
+          <div class="tc-transparency-pills">
+            <span>UNSW-NB15</span>
+            <span>Courriels anglais</span>
+            <span>Pas de DNS réel</span>
+            <span>Pas de téléphonie réelle</span>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if not items:
+        st.info(
+            "Aucune donnée de démonstration n’est encore enregistrée. Lancez la simulation pour générer un scénario de vigilance synthétique."
+        )
+
+    st.markdown("### Démo mode · AI4YOUTH DEMO")
+    st.caption("SCÉNARIO DE DÉMONSTRATION — DONNÉES SYNTHÉTIQUES")
+
+    demo_actions = st.columns(3)
+    with demo_actions[0]:
+        if st.button("▶ Lancer la simulation", key="launch_demo_scenario", use_container_width=True):
+            try:
+                scenario = get_demo_scenario()
+            except APIError as exc:
+                st.warning(f"La simulation de démo est indisponible : {exc}")
+            else:
+                st.success(f"{scenario['scenario']} · {scenario['notice']}")
+                st.markdown(f"**RISK SCORE** : {scenario['risk_score']}/100")
+                st.markdown(f"**SEVERITY** : {scenario['severity']}")
+                st.markdown(f"**AFFECTED ASSET** : {scenario['asset']}")
+                for fact in scenario["facts"]:
+                    st.markdown(f"- {fact}")
+                for step in scenario["steps"]:
+                    st.markdown(f"**{step['order']}. {step['name']}** — {step['description']}")
+                st.markdown("**RECOMMENDATIONS**")
+                for recommendation in scenario["recommendations"]:
+                    st.markdown(f"- {recommendation}")
+    with demo_actions[1]:
+        if st.button("🧹 Réinitialiser l’historique", key="demo_reset_history", use_container_width=True, type="secondary"):
+            if st.confirm("Supprimer l’historique local de cette session de démonstration ?"):
+                try:
+                    clear_history()
+                    st.success("Historique réinitialisé.")
+                    st.rerun()
+                except APIError as exc:
+                    render_error(str(exc))
+    with demo_actions[2]:
+        st.button(
+            "🛡 Ouvrir le SOC",
+            key="demo_open_soc",
+            use_container_width=True,
+            on_click=_navigate,
+            args=("Tableau de bord SOC",),
+        )
+
+    if posture:
+        st.markdown("### Security Posture")
+        st.metric("Score global", f"{posture['overall_score']}/100")
+        st.caption(f"Niveau : {posture['level']} — {posture['summary']}")
+        for category in posture["categories"][:4]:
+            st.progress(category["score"] / 100, text=f"{category['name']} : {category['score']}/100")
+
+    st.markdown("### Votre espace de vigilance")
+    st.caption("Vérifiez un message suspect, suivez les analyses et accédez aux outils SOC selon votre rôle.")
+
+    st.markdown(
+        f"""
+        <section class="tc-soc-brief" aria-label="Synthèse courte du command center">
+          <div class="tc-soc-brief-head">
+            <span>Command brief</span>
+            <small>Panorama rapide</small>
+          </div>
+          <div class="tc-soc-brief-grid">
+            <article class="tc-soc-brief-card tc-soc-brief-red">
+              <span class="tc-soc-brief-label">Alertes</span>
+              <strong>{len(suspicious)}</strong>
+              <small>À traiter</small>
+            </article>
+            <article class="tc-soc-brief-card tc-soc-brief-gold">
+              <span class="tc-soc-brief-label">Historique</span>
+              <strong>{len(items)}</strong>
+              <small>Éléments conservés</small>
+            </article>
+            <article class="tc-soc-brief-card tc-soc-brief-cyan">
+              <span class="tc-soc-brief-label">Réseau</span>
+              <strong>{len(network_items)}</strong>
+              <small>Flux observés</small>
+            </article>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+        <section class="tc-priority-panel" aria-label="Priorités d’intervention SOC">
+          <div class="tc-priority-header">
+            <span>Priorités d’intervention</span>
+            <small>Focus opérationnel</small>
+          </div>
+          <div class="tc-priority-grid">
+            <article class="tc-priority-card tc-priority-alert">
+              <div class="tc-priority-thumb">⚑</div>
+              <div>
+                <strong>{len(suspicious)}</strong>
+                <small>Éléments signalés</small>
+              </div>
+            </article>
+            <article class="tc-priority-card tc-priority-watch">
+              <div class="tc-priority-thumb">◉</div>
+              <div>
+                <strong>{len(network_items)}</strong>
+                <small>Flux réseau surveillés</small>
+              </div>
+            </article>
+            <article class="tc-priority-card tc-priority-ok">
+              <div class="tc-priority-thumb">✓</div>
+              <div>
+                <strong>{len(items)}</strong>
+                <small>Analyses dans l’historique</small>
+              </div>
+            </article>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("### Raccourcis de démonstration")
+    quick_actions = st.columns(5)
+    with quick_actions[0]:
+        st.button(
+            "📘 Guide",
+            key="home_quick_guide",
+            use_container_width=True,
+            on_click=_navigate,
+            args=("Guide utilisateur",),
+        )
+    with quick_actions[1]:
+        st.button(
+            "👤 Profil",
+            key="home_quick_profile",
+            use_container_width=True,
+            on_click=_navigate,
+            args=("Mon profil",),
+        )
+    with quick_actions[2]:
+        st.button(
+            "🛡 SOC",
+            key="home_quick_soc",
+            use_container_width=True,
+            on_click=_navigate,
+            args=("Tableau de bord SOC",),
+        )
+    with quick_actions[3]:
+        st.button(
+            "⚑ Alertes",
+            key="home_quick_alerts",
+            use_container_width=True,
+            on_click=_navigate,
+            args=("Alertes (SOC)",),
+        )
+    with quick_actions[4]:
+        if st.button(
+            "🧹 Réinitialiser",
+            key="home_clear_history",
+            use_container_width=True,
+            type="secondary",
+        ):
+            if st.confirm("Supprimer l’historique local de cette session de démonstration ?"):
+                try:
+                    clear_history()
+                    st.success("Historique réinitialisé.")
+                    st.rerun()
+                except APIError as exc:
+                    render_error(str(exc))
+
+    model_details = health.get("model_details", {})
 
     _render_summary(items)
     st.divider()
 
+    _inject_quick_action_style()
     left, right = st.columns([1.15, 0.85], gap="large")
     with left:
         st.markdown("### Vérifier un message")

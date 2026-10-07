@@ -16,10 +16,12 @@ class AssistantTests(unittest.TestCase):
         self.assertIn("code OTP", messages[0]["content"])
         self.assertIn("SMS suspect", messages[1]["content"])
 
-    def test_missing_key_is_an_explicit_unavailable_error(self):
+    def test_missing_key_returns_demo_guidance_instead_of_error(self):
         with patch("backend.app.services.assistant_service.settings", SimpleNamespace(openai_api_key="", openai_model="test")):
-            with self.assertRaises(AssistantUnavailable):
-                ask_assistant("Question de prévention")
+            result = ask_assistant("Comment vérifier un SMS suspect ?")
+        self.assertIn("SMS suspect", result["response"])
+        self.assertIn("vérifier", result["response"].lower())
+        self.assertIn("Prototype de recherche", result["disclaimer"])
 
     def test_blank_assistant_request_is_rejected_as_input_error(self):
         with self.assertRaises(HTTPException) as error:

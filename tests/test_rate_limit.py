@@ -62,6 +62,17 @@ class SlidingWindowRateLimiterTests(unittest.TestCase):
             direct = rate_limit.client_key(self._request("198.51.100.20"))
         self.assertEqual(forwarded, direct)
 
+    def test_trusted_proxy_accepts_x_real_ip_when_forwarded_for_is_absent(self):
+        test_settings = replace(rate_limit.settings, trusted_proxy_cidrs=("10.0.0.0/8",))
+        request = SimpleNamespace(
+            headers={"x-real-ip": "203.0.113.77"},
+            client=SimpleNamespace(host="10.0.0.2"),
+        )
+        with patch.object(rate_limit, "settings", test_settings):
+            forwarded = rate_limit.client_key(request)
+            direct = rate_limit.client_key(self._request("203.0.113.77"))
+        self.assertEqual(forwarded, direct)
+
 
 class RateLimitMiddlewareTests(unittest.TestCase):
     def _build_app(self, max_requests: int) -> FastAPI:
@@ -93,6 +104,18 @@ class RateLimitMiddlewareTests(unittest.TestCase):
         client = TestClient(self._build_app(1))
         for _ in range(5):
             self.assertEqual(client.get("/api/v1/health").status_code, 200)
+
+    def test_health_probe_routes_are_exempt_from_throttling(self):
+        client = TestClient(self._build_app(1))
+        for path in (
+            "/api/v1/health",
+            "/api/v1/health/",
+            "/api/v1/health/live",
+            "/api/v1/health/ready",
+            "/api/v1/health/live/",
+        ):
+            for _ in range(5):
+                self.assertEqual(client.get(path).status_code, 200)
 
     def test_disabled_limiter_never_throttles(self):
         client = TestClient(self._build_app(0))

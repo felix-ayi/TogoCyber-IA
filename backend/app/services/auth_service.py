@@ -14,8 +14,11 @@ from backend.app.repositories import auth_repository
 from backend.app.repositories.auth_repository import LastAdminError
 
 TOKEN_LIFETIME_SECONDS = 30 * 60
+PASSWORD_RESET_TTL_SECONDS = 30 * 60
+PASSWORD_RESET_WINDOW_SECONDS = 15 * 60
 LOGIN_WINDOW_SECONDS = 15 * 60
 MAX_LOGIN_FAILURES = 5
+MAX_PASSWORD_RESET_REQUESTS = 3
 PBKDF2_ITERATIONS = 600_000
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -151,6 +154,63 @@ def delete_managed_user(user_id: int, actor_id: int) -> None:
         if auth_repository.count_active_admins(exclude_user_id=user_id) < 1:
             raise LastAdminError("Impossible de supprimer le dernier administrateur actif.")
     auth_repository.delete_user(user_id)
+
+
+def request_password_reset(email: str, client_identifier: str, now: int | None = None) -> str:
+    current_time = int(time.time()) if now is None else now
+    client_hash = auth_repository.client_identifier_hash(client_identifier)
+    window_start = current_time - PASSWORD_RESET_WINDOW_SECONDS
+    if not auth_repository.begin_password_reset_attempt(
+        client_hash, current_time, window_start, MAX_PASSWORD_RESET_REQUESTS
+    ):
+        raise LoginRateLimited("Trop de demandes de réinitialisation. Réessayez dans 15 minutes.")
+    normalized = ""
+    try:
+        normalized = normalize_email(email)
+    except ValueError:
+        return ""
+    user = auth_repository.find_user_by_email(normalized)
+    if user is None or not user["is_active"]:
+        return ""
+    token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    auth_repository.create_password_reset_token(
+        int(user["id"]),
+        token_hash,
+        current_time + PASSWORD_RESET_TTL_SECONDS,
+    )
+    return token
+
+
+def confirm_password_reset(email: str, token: str, new_password: str, now: int | None = None) -> dict:
+    current_time = int(time.time()) if now is None else now
+    try:
+        normalized = normalize_email(email)
+    except ValueError as exc:
+        raise AuthenticationError("Le lien de réinitialisation est invalide ou expiré.") from exc
+    if len(new_password) < 12 or len(new_password) > 128:
+        raise ValueError("Le mot de passe doit contenir entre 12 et 128 caractères.")
+    user = auth_repository.find_user_by_email(normalized)
+    if user is None or not user["is_active"]:
+        raise AuthenticationError("Le lien de réinitialisation est invalide ou expiré.")
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    user_id = auth_repository.find_password_reset_token(normalized, token_hash, current_time)
+    if user_id is None or user_id != int(user["id"]):
+        raise AuthenticationError("Le lien de réinitialisation est invalide ou expiré.")
+    auth_repository.replace_password_hash(user_id, _password_hash(new_password))
+    auth_repository.consume_password_reset_token(token_hash, current_time)
+    return auth_repository.find_active_user(user_id)
+
+
+def change_password_for_user(user_id: int, current_password: str, new_password: str) -> None:
+    user = auth_repository.find_user_by_id_with_password(user_id)
+    if user is None or not user["is_active"]:
+        raise AuthenticationError("Utilisateur introuvable.")
+    if not _verify_password(current_password, user["password_hash"]):
+        raise AuthenticationError("Le mot de passe actuel est incorrect.")
+    if len(new_password) < 12 or len(new_password) > 128:
+        raise ValueError("Le mot de passe doit contenir entre 12 et 128 caractères.")
+    auth_repository.replace_password_hash(user_id, _password_hash(new_password))
 
 
 def _issue_token(user: dict, now: int | None = None) -> dict:

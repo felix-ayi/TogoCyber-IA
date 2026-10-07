@@ -153,6 +153,89 @@ def purge_expired(now: datetime | None = None) -> int:
         return purged
 
 
+def clear_history(user_id: int | None = None) -> int:
+    """Delete a user's recent analysis history and all SOC artefacts linked to it.
+
+    For an admin or analyst, the full history is cleared. For a regular user, only the
+    rows scoped to that account are removed. The function intentionally keeps the core
+    operational records (alerts/incidents/audit log) aligned with the corresponding
+    analysis metadata to avoid orphaned state in the demo database.
+    """
+    with _connection() as connection:
+        if user_id is None:
+            history_rows = connection.execute("SELECT id FROM analysis_history").fetchall()
+        else:
+            history_rows = connection.execute(
+                "SELECT id FROM analysis_history WHERE user_id = ?",
+                (user_id,),
+            ).fetchall()
+        history_ids = [row["id"] for row in history_rows]
+        if not history_ids:
+            return 0
+
+        history_placeholders = ", ".join("?" for _ in history_ids)
+        incident_rows = connection.execute(
+            f"SELECT id FROM incidents WHERE history_id IN ({history_placeholders})",
+            history_ids,
+        ).fetchall()
+        incident_ids = [row["id"] for row in incident_rows]
+
+        alert_rows = connection.execute(
+            f"SELECT id FROM alerts WHERE history_id IN ({history_placeholders}) OR incident_id IN ({','.join('?' for _ in incident_ids)})",
+            [*history_ids, *incident_ids],
+        ).fetchall() if incident_ids else connection.execute(
+            f"SELECT id FROM alerts WHERE history_id IN ({history_placeholders})",
+            history_ids,
+        ).fetchall()
+        alert_ids = [row["id"] for row in alert_rows]
+
+        if alert_ids:
+            connection.execute(
+                f"DELETE FROM correlation_finding_alerts WHERE alert_id IN ({','.join('?' for _ in alert_ids)})",
+                alert_ids,
+            )
+            connection.execute(
+                f"DELETE FROM alert_comments WHERE alert_id IN ({','.join('?' for _ in alert_ids)})",
+                alert_ids,
+            )
+            connection.execute(
+                f"DELETE FROM alert_status_events WHERE alert_id IN ({','.join('?' for _ in alert_ids)})",
+                alert_ids,
+            )
+            connection.execute(
+                f"DELETE FROM alert_tags WHERE alert_id IN ({','.join('?' for _ in alert_ids)})",
+                alert_ids,
+            )
+            connection.execute(
+                f"DELETE FROM model_feedback WHERE alert_id IN ({','.join('?' for _ in alert_ids)})",
+                alert_ids,
+            )
+            connection.execute(
+                f"DELETE FROM alerts WHERE id IN ({','.join('?' for _ in alert_ids)})",
+                alert_ids,
+            )
+
+        if incident_ids:
+            connection.execute(
+                f"DELETE FROM incident_status_events WHERE incident_id IN ({','.join('?' for _ in incident_ids)})",
+                incident_ids,
+            )
+            connection.execute(
+                f"DELETE FROM incidents WHERE id IN ({','.join('?' for _ in incident_ids)})",
+                incident_ids,
+            )
+
+        connection.execute(
+            f"DELETE FROM model_feedback WHERE history_id IN ({history_placeholders})",
+            history_ids,
+        )
+        connection.execute(
+            f"DELETE FROM analysis_history WHERE id IN ({history_placeholders})",
+            history_ids,
+        )
+        return len(history_ids)
+
+
 def record_event(
     module: str,
     prediction: str,

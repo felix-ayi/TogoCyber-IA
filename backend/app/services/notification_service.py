@@ -12,6 +12,7 @@ from email.message import EmailMessage
 
 import requests
 
+from backend.app.core.config import settings
 from backend.app.repositories import notification_repository
 
 _TIMEOUT_SECONDS = 10
@@ -70,16 +71,49 @@ def _deliver_slack(url: str, notification: dict) -> None:
 
 
 def _deliver_email(config: dict, notification: dict) -> None:
+    _send_email(
+        config,
+        config["recipient"],
+        f"[{notification['severity']}] {notification['subject']}",
+        notification["body"],
+    )
+
+
+def _send_email(config: dict, recipient: str, subject: str, body: str) -> None:
     message = EmailMessage()
-    message["Subject"] = f"[{notification['severity']}] {notification['subject']}"
+    message["Subject"] = subject
     message["From"] = config["sender"]
-    message["To"] = config["recipient"]
-    message.set_content(notification["body"])
+    message["To"] = recipient
+    message.set_content(body)
     with smtplib.SMTP(config["host"], config["port"], timeout=_TIMEOUT_SECONDS) as server:
         server.starttls()
         if config["username"] and config["password"]:
             server.login(config["username"], config["password"])
         server.send_message(message)
+
+
+def send_password_reset_email(recipient: str, token: str) -> bool:
+    """Deliver a reset token only through the configured SMTP transport."""
+    host = _env("NOTIFICATION_SMTP_HOST")
+    sender = settings.password_reset_sender_email
+    if not settings.password_reset_email_enabled or not host or not sender:
+        return False
+
+    config = {
+        "host": host,
+        "port": int(_env("NOTIFICATION_SMTP_PORT") or "587"),
+        "username": _env("NOTIFICATION_SMTP_USERNAME"),
+        "password": _env("NOTIFICATION_SMTP_PASSWORD"),
+        "sender": sender,
+    }
+    body = (
+        "Une demande de réinitialisation du mot de passe a été effectuée pour votre compte.\n\n"
+        f"Votre jeton de réinitialisation : {token}\n\n"
+        "Ce jeton expire dans 30 minutes et ne peut être utilisé qu’une seule fois. "
+        "Si vous n’êtes pas à l’origine de cette demande, ignorez ce message."
+    )
+    _send_email(config, recipient, "Réinitialisation de votre mot de passe TogoCyber-IA", body)
+    return True
 
 
 def _deliver(channel: str, config: dict, notification: dict) -> None:

@@ -53,11 +53,38 @@ def render() -> None:
         "Alertes générées automatiquement par les détections de risque moyen à critique. "
         "Réservé aux analystes et administrateurs. Les scores restent indicatifs."
     )
+    st.markdown(
+        """
+        <div class="tc-ops-summary">
+          <div>
+            <span class="tc-soc-summary-kicker">ALERTES</span>
+            <h3>File de traitement opérationnelle</h3>
+          </div>
+          <div class="tc-ops-summary-badges">
+            <span>Tri prioritaire</span>
+            <span>Triage analyste</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     user = st.session_state.get("auth_user", {})
     if user.get("role") not in {"Admin", "Analyst"}:
         st.warning("Cette section est réservée aux analystes et administrateurs.")
         return
 
+    st.markdown(
+        """
+        <div class="tc-filter-shell">
+          <div>
+            <span class="tc-soc-summary-kicker">FILTRES</span>
+            <strong>Tri de la file d’alertes</strong>
+          </div>
+          <span class="tc-filter-tag">SOC</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     filter_status = st.selectbox(
         "Filtrer par statut",
         options=["all", *_STATUS_LABELS],

@@ -6,9 +6,10 @@ from unittest.mock import patch
 from frontend.components import export_button
 from frontend.services.analysis_report import build_analysis_report
 from frontend.services.response_guidance import get_action_guidance
+from frontend.styles.theme import build_theme_css
 from frontend.views import authentication
 from frontend.views.home import _comparison_rows
-from frontend.components.sidebar import pages_for_role
+from frontend.components.sidebar import apply_navigation_override, pages_for_role
 
 
 class DashboardTests(unittest.TestCase):
@@ -27,6 +28,14 @@ class DashboardTests(unittest.TestCase):
             pages = pages_for_role(unsupported_role)
             self.assertNotIn("Gestion des utilisateurs", pages)
             self.assertNotIn("Tableau de bord SOC", pages)
+
+    def test_navigation_override_is_applied_before_widget_instantiation(self):
+        state = {"profile_page_target": "Mon profil", "main_navigation": "Accueil"}
+
+        apply_navigation_override(["Accueil", "Mon profil"], state)
+
+        self.assertEqual(state["main_navigation"], "Mon profil")
+        self.assertNotIn("profile_page_target", state)
 
     def test_auth_mode_shows_clear_sign_in_and_sign_up_labels(self):
         with (
@@ -181,6 +190,14 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(rows[0]["F1 validation"], "—")
         self.assertEqual(rows[0]["F1 test"], "—")
         self.assertEqual(rows[0]["Modèle retenu"], "Oui")
+
+    def test_theme_builder_applies_user_preferences_for_accessibility(self):
+        css = build_theme_css("Sécurité claire", compact_mode=True, reduced_motion=True)
+
+        self.assertIn("--tc-bg: #f4f7fb", css)
+        self.assertIn("--tc-text: #162c4d", css)
+        self.assertIn("prefers-reduced-motion", css.lower())
+        self.assertIn("max-width: 1280px", css)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 
 from backend.app.core.auth import get_current_user
-from backend.app.services.history_service import get_history
+from backend.app.services.history_service import get_history, reset_history
 
 router = APIRouter(prefix="/history", tags=["Analysis History"])
 
@@ -14,3 +14,10 @@ def history(
 ):
     user_id = None if user["role"] in {"Admin", "Analyst"} else user["id"]
     return {"items": get_history(limit, user_id=user_id, offset=offset)}
+
+
+@router.delete("/clear", status_code=status.HTTP_204_NO_CONTENT)
+def clear_history(user: dict = Depends(get_current_user)) -> None:
+    user_id = None if user["role"] in {"Admin", "Analyst"} else user["id"]
+    reset_history(user_id=user_id)
+    return None

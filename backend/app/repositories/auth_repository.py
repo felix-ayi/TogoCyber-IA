@@ -65,7 +65,7 @@ def find_user_by_email(email: str) -> dict | None:
 def find_active_user(user_id: int) -> dict | None:
     with _connection() as connection:
         row = connection.execute(
-            "SELECT id, email, role, is_active FROM users WHERE id = ? AND is_active = 1",
+            "SELECT id, email, role, is_active, created_at FROM users WHERE id = ? AND is_active = 1",
             (user_id,),
         ).fetchone()
     return dict(row) if row is not None else None
@@ -93,6 +93,15 @@ def get_user_by_id(user_id: int) -> dict | None:
             (user_id,),
         ).fetchone()
     return {**dict(row), "is_active": bool(row["is_active"])} if row is not None else None
+
+
+def find_user_by_id_with_password(user_id: int) -> dict | None:
+    with _connection() as connection:
+        row = connection.execute(
+            "SELECT id, email, password_hash, role, is_active, created_at FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+    return dict(row) if row is not None else None
 
 
 def count_active_admins(exclude_user_id: int | None = None) -> int:
@@ -251,6 +260,63 @@ def clear_login_attempts(client_hash: str) -> None:
         connection.execute(
             "DELETE FROM auth_login_attempts WHERE client_hash = ?",
             (client_hash,),
+        )
+
+
+def begin_password_reset_attempt(
+    client_hash: str,
+    now: int,
+    window_start: int,
+    max_attempts: int,
+) -> bool:
+    with _connection() as connection:
+        connection.execute(
+            "DELETE FROM auth_login_attempts WHERE attempted_at < ?",
+            (window_start,),
+        )
+        row = connection.execute(
+            "SELECT COUNT(*) AS attempt_count FROM auth_login_attempts "
+            "WHERE client_hash = ? AND attempted_at >= ?",
+            (client_hash, window_start),
+        ).fetchone()
+        if int(row["attempt_count"]) >= max_attempts:
+            return False
+        connection.execute(
+            "INSERT INTO auth_login_attempts (client_hash, attempted_at) VALUES (?, ?)",
+            (client_hash, now),
+        )
+        return True
+
+
+def create_password_reset_token(user_id: int, token_hash: str, expires_at: int) -> None:
+    with _connection() as connection:
+        connection.execute(
+            "DELETE FROM password_reset_tokens WHERE user_id = ?",
+            (user_id,),
+        )
+        connection.execute(
+            "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
+            (user_id, token_hash, expires_at),
+        )
+
+
+def find_password_reset_token(email: str, token_hash: str, now: int) -> int | None:
+    with _connection() as connection:
+        row = connection.execute(
+            "SELECT prt.user_id FROM password_reset_tokens prt "
+            "JOIN users u ON u.id = prt.user_id "
+            "WHERE u.email = ? COLLATE NOCASE AND prt.token_hash = ? AND prt.used_at IS NULL "
+            "AND prt.expires_at > ?",
+            (email, token_hash, now),
+        ).fetchone()
+    return int(row["user_id"]) if row is not None else None
+
+
+def consume_password_reset_token(token_hash: str, now: int) -> None:
+    with _connection() as connection:
+        connection.execute(
+            "UPDATE password_reset_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL",
+            (now, token_hash),
         )
 
 

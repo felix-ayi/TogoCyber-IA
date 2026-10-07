@@ -21,6 +21,21 @@ def render() -> None:
         "activation/désactivation et réinitialisation de mot de passe. "
         "Le dernier administrateur actif ne peut être ni dégradé, ni désactivé, ni supprimé."
     )
+    st.markdown(
+        """
+        <div class="tc-ops-summary">
+          <div>
+            <span class="tc-soc-summary-kicker">ACCES</span>
+            <h3>Administration des comptes</h3>
+          </div>
+          <div class="tc-ops-summary-badges">
+            <span>Rôles</span>
+            <span>Activations</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     current_user = st.session_state.get("auth_user", {})
     if current_user.get("role") != "Admin":
         st.warning("Cette section est réservée aux administrateurs.")

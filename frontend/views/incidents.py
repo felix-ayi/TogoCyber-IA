@@ -22,6 +22,21 @@ def render() -> None:
     st.caption(
         "Les scores élevés créent un incident de suivi ; ils restent indicatifs et ne prouvent pas une compromission."
     )
+    st.markdown(
+        """
+        <div class="tc-ops-summary">
+          <div>
+            <span class="tc-soc-summary-kicker">INCIDENTS</span>
+            <h3>Suivi des cas à traiter</h3>
+          </div>
+          <div class="tc-ops-summary-badges">
+            <span>État réel</span>
+            <span>Historique des transitions</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     user = st.session_state.get("auth_user", {})
     can_manage = user.get("role") in {"Admin", "Analyst"}
     try:
@@ -29,6 +44,19 @@ def render() -> None:
     except APIError as exc:
         render_error(str(exc))
         return
+
+    st.markdown(
+        """
+        <div class="tc-filter-shell">
+          <div>
+            <span class="tc-soc-summary-kicker">FILTRES</span>
+            <strong>Vue d’incidents</strong>
+          </div>
+          <span class="tc-filter-tag">OPÉRATION</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if can_manage:
         render_export_button(

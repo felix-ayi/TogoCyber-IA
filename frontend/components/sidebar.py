@@ -3,6 +3,8 @@ import streamlit as st
 from frontend.services.api_client import APIError, get_health, logout
 PAGES = [
     "Accueil",
+    "Guide utilisateur",
+    "Mon profil",
     "Analyse réseau",
     "Analyse phishing / SMS",
     "Analyse URL",
@@ -28,6 +30,8 @@ PAGES = [
 
 PAGE_ICONS = {
     "Accueil": "⌂",
+    "Guide utilisateur": "❔",
+    "Mon profil": "👤",
     "Analyse réseau": "⌁",
     "Analyse phishing / SMS": "✉",
     "Analyse URL": "↗",
@@ -74,6 +78,12 @@ def pages_for_role(role: str | None) -> list[str]:
     ]
 
 
+def apply_navigation_override(visible_pages: list[str], session_state: dict) -> None:
+    requested = session_state.pop("profile_page_target", None)
+    if requested in visible_pages:
+        session_state["main_navigation"] = requested
+
+
 def select_page() -> str:
     with st.sidebar:
         st.markdown(
@@ -85,17 +95,6 @@ def select_page() -> str:
         user = st.session_state.get("auth_user", {})
         role = user.get("role")
         visible_pages = pages_for_role(role)
-        if user:
-            st.caption(f"Connecté : {user.get('email')} · rôle {user.get('role')}")
-            if st.button("Se déconnecter", key="logout_button"):
-                try:
-                    logout()
-                except APIError as exc:
-                    st.warning(f"Déconnexion distante impossible : {exc}")
-                finally:
-                    st.session_state.pop("auth_token", None)
-                    st.session_state.pop("auth_user", None)
-                st.rerun()
         try:
             health = get_health()
             missing = [name for name, ready in health["models"].items() if not ready]
@@ -114,11 +113,58 @@ def select_page() -> str:
                     st.caption(f"{label} — {source}")
         except APIError:
             st.warning("API hors ligne — les analyses sont indisponibles.")
+        apply_navigation_override(visible_pages, st.session_state)
+        sidebar_status = "OK" if health.get("status") == "healthy" else "Hors ligne"
+        st.markdown(
+            f"""
+            <div class="tc-sidebar-summary">
+              <div class="tc-sidebar-summary-top">
+                <span class="tc-sidebar-summary-badge">MODE DÉMO</span>
+                <span class="tc-sidebar-summary-status">{sidebar_status}</span>
+              </div>
+              <div class="tc-sidebar-summary-meta">
+                <span>Rôle : {role or 'Utilisateur'}</span>
+                <span>Scénario : synthétique</span>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.markdown('<p class="tc-sidebar-label">ESPACE DE TRAVAIL</p>', unsafe_allow_html=True)
-        return st.radio(
+        selected_page = st.radio(
             "Navigation",
             visible_pages,
             format_func=lambda page: f"{PAGE_ICONS[page]}   {page}",
             label_visibility="collapsed",
             key="main_navigation",
         )
+
+        st.markdown('<div class="tc-sidebar-user-card">', unsafe_allow_html=True)
+        if user:
+            st.markdown(
+                f"""
+                <div class="tc-sidebar-user-header">
+                    <span class="tc-sidebar-user-badge">{user.get('role', 'User')}</span>
+                    <span class="tc-sidebar-user-meta">Session active</span>
+                </div>
+                <div class="tc-sidebar-user-email">{user.get('email', 'Compte')}</div>
+                """,
+                unsafe_allow_html=True,
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="tc-sidebar-footer">', unsafe_allow_html=True)
+        if st.button("Paramètres utilisateur", key="sidebar_profile_button", use_container_width=True):
+            st.session_state["profile_page_target"] = "Mon profil"
+            st.rerun()
+        if st.button("Se déconnecter", key="logout_button", use_container_width=True):
+            try:
+                logout()
+            except APIError as exc:
+                st.warning(f"Déconnexion distante impossible : {exc}")
+            finally:
+                st.session_state.pop("auth_token", None)
+                st.session_state.pop("auth_user", None)
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+        return selected_page

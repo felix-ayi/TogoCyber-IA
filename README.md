@@ -41,7 +41,15 @@ if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 python scripts\setup.py
 ```
 
-Dans deux terminaux PowerShell depuis la racine du dépôt :
+Option la plus rapide pour démarrer tout en même temps depuis la racine du dépôt :
+
+```powershell
+python scripts\dev_launcher.py
+```
+
+Le lanceur choisit des ports libres, démarre l’API FastAPI et le dashboard Streamlit, puis affiche les URL disponibles.
+
+Pour un démarrage manuel en deux terminaux :
 
 ```powershell
 uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000

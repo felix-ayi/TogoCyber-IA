@@ -68,6 +68,34 @@ def _trusted_proxy_networks(cidrs: tuple[str, ...]) -> tuple:
     return tuple(ipaddress.ip_network(cidr, strict=False) for cidr in cidrs)
 
 
+def _trusted_proxy_client_ip(request, peer: ipaddress._BaseAddress | None, networks: tuple) -> str:
+    """Return the original client IP when requests arrive through a trusted proxy.
+
+    Common reverse proxies emit either X-Forwarded-For or X-Real-IP. The selected value
+    must be the first untrusted hop after the trusted proxy chain; the direct peer is
+    never trusted unless it falls inside a configured proxy network.
+    """
+    if peer is None or not any(peer in network for network in networks):
+        return request.client.host if request.client else "unknown"
+
+    candidates: list[str] = []
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        candidates.extend(item.strip() for item in forwarded.split(",") if item.strip())
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        candidates.append(real_ip.strip())
+
+    for candidate in reversed(candidates):
+        try:
+            address = ipaddress.ip_address(candidate)
+        except ValueError:
+            continue
+        if not any(address in network for network in networks):
+            return address.compressed
+    return request.client.host if request.client else "unknown"
+
+
 def client_key(request) -> str:
     """Stable, non-reversible per-client key.
 
@@ -76,30 +104,26 @@ def client_key(request) -> str:
     only when the direct peer belongs to a configured trusted proxy network.
     """
     host = request.client.host if request.client else "unknown"
-    forwarded = request.headers.get("x-forwarded-for")
     networks = _trusted_proxy_networks(settings.trusted_proxy_cidrs)
     try:
         peer = ipaddress.ip_address(host)
     except ValueError:
         peer = None
-    if forwarded and peer is not None and any(peer in network for network in networks):
-        forwarded_hosts = [item.strip() for item in forwarded.split(",")]
-        for forwarded_host in reversed(forwarded_hosts):
-            try:
-                address = ipaddress.ip_address(forwarded_host)
-            except ValueError:
-                break
-            if not any(address in network for network in networks):
-                host = address.compressed
-                break
+    host = _trusted_proxy_client_ip(request, peer, networks)
     return hmac.new(
         settings.auth_secret_key.encode("utf-8"), host.encode("utf-8"), hashlib.sha256
     ).hexdigest()
 
 
 # Liveness/readiness probes must never be throttled, otherwise an orchestrator would
-# restart a healthy instance that happens to sit behind a busy client.
+# restart a healthy instance that happens to sit behind a busy client. The health
+# group is exempt as a whole, not only the canonical summary endpoint.
 _EXEMPT_PATHS = frozenset({"/", "/api/v1/health"})
+
+
+def _is_health_probe(path: str) -> bool:
+    normalized = (path.rstrip("/") or "/")
+    return normalized in _EXEMPT_PATHS or normalized.startswith("/api/v1/health/")
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -108,7 +132,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.limiter = limiter
 
     async def dispatch(self, request: Request, call_next):
-        if self.limiter.max_requests <= 0 or request.url.path in _EXEMPT_PATHS:
+        if self.limiter.max_requests <= 0 or _is_health_probe(request.url.path):
             return await call_next(request)
         allowed, retry_after = self.limiter.allow(client_key(request))
         if not allowed:

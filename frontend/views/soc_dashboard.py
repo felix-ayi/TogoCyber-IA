@@ -46,11 +46,31 @@ def render() -> None:
     alerts = overview["alerts"]
     incidents = overview["incidents"]
 
+    st.markdown(
+        """
+        <div class="tc-soc-summary">
+            <div class="tc-soc-summary-copy">
+                <span class="tc-soc-summary-kicker">VUE OPÉRATIONNELLE</span>
+                <h3>Command center · vigilance active</h3>
+            </div>
+            <div class="tc-soc-summary-badges">
+                <span>Flux en temps réel</span>
+                <span>Historique réel</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     first, second, third, fourth = st.columns(4)
-    first.metric("Alertes ouvertes", alerts["open"])
-    second.metric("Non assignées", alerts["unassigned_open"])
-    third.metric("Critiques ouvertes", alerts["critical_open"])
-    fourth.metric("Incidents actifs", incidents["active"])
+    with first:
+        st.metric("Alertes ouvertes", alerts["open"])
+    with second:
+        st.metric("Non assignées", alerts["unassigned_open"])
+    with third:
+        st.metric("Critiques ouvertes", alerts["critical_open"])
+    with fourth:
+        st.metric("Incidents actifs", incidents["active"])
 
     st.divider()
     left, right = st.columns(2)

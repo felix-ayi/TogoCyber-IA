@@ -12,12 +12,14 @@ from frontend.views import (
     ai_assistant,
     authentication,
     cookies,
+    guide,
     history,
     incidents,
     home,
     network_analysis,
     phishing_analysis,
     privacy,
+    profile,
     terms,
     transparency,
     url_analysis,
@@ -32,7 +34,15 @@ from frontend.views import (
 )
 
 st.set_page_config(page_title="TogoCyber AI", layout="wide", initial_sidebar_state="expanded")
-st.markdown(stylesheet(), unsafe_allow_html=True)
+profile_preferences = st.session_state.get("profile_preferences", {})
+st.markdown(
+    stylesheet(
+        profile_preferences.get("theme", "Nuit cyber"),
+        profile_preferences.get("compact_mode", False),
+        profile_preferences.get("reduced_motion", False),
+    ),
+    unsafe_allow_html=True,
+)
 
 if not st.session_state.get("auth_token"):
     authentication.render()
@@ -56,6 +66,8 @@ render_header()
 st.caption("Prototype de recherche — ne soumettez pas d’informations réellement confidentielles.")
 renderers = {
     "Accueil": home.render,
+    "Guide utilisateur": guide.render,
+    "Mon profil": profile.render,
     "Analyse réseau": network_analysis.render,
     "Analyse phishing / SMS": phishing_analysis.render,
     "Analyse URL": url_analysis.render,
@@ -83,7 +95,7 @@ renderers[page]()
 if not st.session_state.get("essential_cookie_choice", False):
     st.markdown(
         '<div role="note" aria-label="Information sur les cookies" '
-        'style="padding:12px;border:1px solid #31506f;border-radius:8px;background:#fff">'
+        'style="padding:12px;border:1px solid #31506f;border-radius:8px;background:#0d1b2b;color:#edf5fa;box-shadow:0 12px 26px rgba(0,0,0,0.16);">'
         'Cette démonstration utilise uniquement des cookies techniques de session.</div>',
         unsafe_allow_html=True,
     )

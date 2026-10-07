@@ -18,6 +18,41 @@ class APIError(RuntimeError):
         self.status_code = status_code
 
 
+def _format_error_detail(payload: object) -> str:
+    if isinstance(payload, dict):
+        detail = payload.get("detail")
+        if isinstance(detail, list):
+            messages: list[str] = []
+            for item in detail:
+                if isinstance(item, dict):
+                    loc = ".".join(str(part) for part in item.get("loc", []) if part not in {"body", "query"})
+                    msg = item.get("msg")
+                    if not msg:
+                        continue
+                    if loc:
+                        messages.append(f"{msg} ({loc})")
+                    else:
+                        messages.append(str(msg))
+                else:
+                    messages.append(str(item))
+            if messages:
+                return "; ".join(messages)
+        if detail is not None:
+            if isinstance(detail, dict):
+                msg = detail.get("msg")
+                if msg:
+                    return str(msg)
+            return str(detail)
+        return "La requête a échoué."
+    if isinstance(payload, list):
+        messages = [str(item) for item in payload if item is not None]
+        if messages:
+            return "; ".join(messages)
+    if payload is None:
+        return "La requête a échoué."
+    return str(payload)
+
+
 def _request(method: str, path: str, **kwargs):
     headers = dict(kwargs.pop("headers", {}))
     token = st.session_state.get("auth_token")
@@ -40,7 +75,7 @@ def _request(method: str, path: str, **kwargs):
     except ValueError as exc:
         raise APIError(f"L’API a renvoyé une réponse invalide (HTTP {response.status_code}).") from exc
     if not response.ok:
-        detail = payload.get("detail", "La requête n’a pas pu aboutir.") if isinstance(payload, dict) else "La requête n’a pas pu aboutir."
+        detail = _format_error_detail(payload)
         raise APIError(f"{detail} (HTTP {response.status_code})", response.status_code)
     return payload
 
@@ -64,6 +99,10 @@ def ask_assistant(message: str) -> dict:
 def get_history(limit: int = 50) -> list[dict]:
     payload = _request("GET", "/api/v1/history", params={"limit": limit})
     return payload["items"]
+
+
+def clear_history() -> None:
+    _request("DELETE", "/api/v1/history/clear")
 
 
 def get_incidents(limit: int = 50, status: str | None = None) -> list[dict]:
@@ -339,6 +378,14 @@ def get_health() -> dict:
     return _request("GET", "/api/v1/health")
 
 
+def get_security_posture() -> dict:
+    return _request("GET", "/api/v1/security/posture")
+
+
+def get_demo_scenario() -> dict:
+    return _request("GET", "/api/v1/demo/scenario")
+
+
 def register(email: str, password: str) -> dict:
     return _request("POST", "/api/v1/auth/register", json={"email": email, "password": password})
 
@@ -349,6 +396,22 @@ def login(email: str, password: str) -> dict:
 
 def logout() -> None:
     _request("POST", "/api/v1/auth/logout")
+
+
+def request_password_reset(email: str) -> dict:
+    return _request("POST", "/api/v1/auth/password/request", json={"email": email})
+
+
+def confirm_password_reset(email: str, token: str, password: str) -> dict:
+    return _request(
+        "POST",
+        "/api/v1/auth/password/reset",
+        json={"email": email, "token": token, "password": password},
+    )
+
+
+def change_password(current_password: str, new_password: str) -> None:
+    _request("POST", "/api/v1/auth/me/password", json={"current_password": current_password, "new_password": new_password})
 
 
 def get_current_user() -> dict:

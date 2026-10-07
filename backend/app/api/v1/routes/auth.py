@@ -1,16 +1,23 @@
+import logging
+import smtplib
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.app.core.auth import get_current_user, require_roles
+from backend.app.core.config import settings
 from backend.app.core.rate_limit import client_key
 from backend.app.repositories.audit_repository import record_event as record_audit_event
 from backend.app.repositories.auth_repository import DuplicateUserError
 from backend.app.schemas.auth import (
     AuthResponse,
+    ChangePasswordRequest,
     CredentialsRequest,
     ManagedUserRequest,
     ManagedUserResponse,
+    PasswordResetEmailRequest,
     PasswordResetRequest,
+    PasswordResetTokenRequest,
     RegistrationRequest,
     UserDetailListResponse,
     UserDetailResponse,
@@ -23,6 +30,8 @@ from backend.app.services.auth_service import (
     LoginRateLimited,
     SelfActionError,
     UserNotFoundError,
+    change_password_for_user,
+    confirm_password_reset,
     create_managed_user as provision_user,
     delete_managed_user,
     get_managed_user,
@@ -30,12 +39,15 @@ from backend.app.services.auth_service import (
     login as authenticate,
     logout as revoke,
     register_user,
+    request_password_reset,
     reset_managed_password,
     update_managed_user,
 )
+from backend.app.services.notification_service import send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 _bearer_scheme = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -94,6 +106,74 @@ def logout(
 @router.get("/me", response_model=UserResponse)
 def me(user: dict = Depends(get_current_user)):
     return user
+
+
+@router.post("/password/request")
+def password_request(
+    request: PasswordResetEmailRequest,
+    client_request: Request,
+):
+    client_identifier = client_key(client_request)
+    try:
+        reset_token = request_password_reset(request.email, client_identifier)
+        if reset_token and settings.password_reset_email_enabled:
+            try:
+                send_password_reset_email(request.email, reset_token)
+            except (OSError, smtplib.SMTPException, ValueError):
+                logger.exception("Password reset email delivery failed")
+                return {
+                    "message": (
+                        "La livraison e-mail a échoué ; le jeton de démonstration est renvoyé "
+                        "localement pour poursuivre le test de la procédure de réinitialisation."
+                    ),
+                    "demo_mode": True,
+                    "reset_token": reset_token,
+                }
+        if reset_token and not settings.password_reset_email_enabled:
+            return {
+                "message": (
+                    "Mode démonstration activé : un jeton de réinitialisation a été généré "
+                    "localement pour permettre le test de la procédure sans serveur SMTP."
+                ),
+                "demo_mode": True,
+                "reset_token": reset_token,
+            }
+    except LoginRateLimited as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(exc),
+        ) from exc
+    return {
+        "message": (
+            "Si un compte correspond à cette adresse, un e-mail de réinitialisation "
+            "sera envoyé lorsque la livraison SMTP est activée et configurée."
+        )
+    }
+
+
+@router.post("/password/reset")
+def password_reset(request: PasswordResetTokenRequest):
+    try:
+        confirm_password_reset(request.email, request.token, request.password)
+    except AuthenticationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return {"message": "Le mot de passe a été mis à jour avec succès."}
+
+
+@router.post("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_user_password(
+    request: ChangePasswordRequest,
+    user: dict = Depends(get_current_user),
+):
+    try:
+        change_password_for_user(user["id"], request.current_password, request.new_password)
+    except AuthenticationError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return None
 
 
 @router.post(

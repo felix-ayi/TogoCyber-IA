@@ -21,6 +21,8 @@ class UserResponse(BaseModel):
     id: int
     email: str
     role: Literal["Admin", "Analyst", "User"]
+    is_active: bool = True
+    created_at: str | None = None
 
 
 class AuthResponse(BaseModel):
@@ -60,5 +62,26 @@ class UserUpdateRequest(BaseModel):
 
 class PasswordResetRequest(BaseModel):
     password: str = Field(min_length=12, max_length=128)
+
+    model_config = {"extra": "forbid"}
+
+
+class PasswordResetEmailRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+
+    model_config = {"extra": "forbid"}
+
+
+class PasswordResetTokenRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    token: str = Field(min_length=20, max_length=512)
+    password: str = Field(min_length=12, max_length=128)
+
+    model_config = {"extra": "forbid"}
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=12, max_length=128)
 
     model_config = {"extra": "forbid"}
