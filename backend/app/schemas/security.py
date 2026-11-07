@@ -8,6 +8,25 @@ class SecurityCategory(BaseModel):
     notes: str
 
 
+class RiskGraphNode(BaseModel):
+    id: str
+    type: str
+    label: str
+    severity: str | None = None
+
+
+class RiskGraphEdge(BaseModel):
+    source: str
+    target: str
+    relation: str
+
+
+class RiskGraphResponse(BaseModel):
+    notice: str = "Graphique construit uniquement à partir des données locales disponibles."
+    nodes: list[RiskGraphNode] = Field(default_factory=list)
+    edges: list[RiskGraphEdge] = Field(default_factory=list)
+
+
 class SecurityPostureResponse(BaseModel):
     overall_score: int = Field(..., ge=0, le=100)
     level: str

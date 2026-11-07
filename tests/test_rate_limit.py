@@ -87,6 +87,10 @@ class RateLimitMiddlewareTests(unittest.TestCase):
             return {"ok": True}
 
         @app.get("/api/v1/health")
+        @app.get("/api/v1/health/")
+        @app.get("/api/v1/health/live")
+        @app.get("/api/v1/health/ready")
+        @app.get("/api/v1/health/live/")
         def health():
             return {"status": "healthy"}
 

@@ -5,7 +5,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 from backend.app.api.v1.routes.assistant import ask_assistant as assistant_endpoint
 from backend.app.schemas.assistant import AssistantRequest
-from backend.app.services.assistant_service import AssistantUnavailable, ask_assistant
+from backend.app.services.assistant_service import ask_assistant
 from ml.assistant.context import build_messages
 
 

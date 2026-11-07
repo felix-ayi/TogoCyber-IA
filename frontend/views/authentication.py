@@ -2,6 +2,32 @@ import os
 
 import streamlit as st
 
+# Streamlit versions used on local Windows installs may predate segmented_control.
+if not hasattr(st, "segmented_control"):
+    def _segmented_control(label: str, options: list[str], default: str | None = None, **kwargs):
+        kwargs.pop("width", None)
+        kwargs.pop("label_visibility", None)
+        return st.radio(label, options, index=options.index(default) if default in options else 0,
+                        horizontal=True, **kwargs)
+
+    st.segmented_control = _segmented_control
+
+# Streamlit builds differ on widget keyword support. Strip optional identity/border
+# arguments so the login panel works across old and recent versions.
+_container = st.container
+
+def _compatible_container(*args, **kwargs):
+    kwargs.pop("key", None)
+    try:
+        return _container(*args, **kwargs)
+    except TypeError as exc:
+        if "unexpected keyword argument 'border'" not in str(exc):
+            raise
+        kwargs.pop("border", None)
+        return _container(*args, **kwargs)
+
+st.container = _compatible_container
+
 from frontend.components.brand_identity import render_brand_identity, render_capabilities
 from frontend.services.api_client import (
     APIError,

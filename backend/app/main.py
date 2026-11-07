@@ -13,6 +13,10 @@ from backend.app.services.auth_service import initialize_bootstrap_admin
 
 configure_logging()
 
+# Keep direct ASGI test clients and first-use deployments from reaching the store
+# before the lifespan hook has run. The operation is additive and idempotent.
+initialize_database()
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:

@@ -335,7 +335,7 @@ class AuthenticationTests(unittest.TestCase):
             auth_service.authenticate_token(tampered_token)
 
     def test_password_reset_flow_uses_single_use_tokens_and_revokes_sessions(self):
-        user = auth_repository.create_user(
+        auth_repository.create_user(
             "reset@example.org",
             auth_service._password_hash("a-long-secure-passphrase"),
             "User",
