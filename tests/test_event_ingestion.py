@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from backend.app.core.auth import get_current_user
 from backend.app.core.config import settings
 from backend.app.main import app
-from backend.app.repositories import event_repository, history_repository
+from backend.app.repositories import alert_repository, event_repository, history_repository
 from backend.app.services.event_ingestion_service import normalize_suricata_event
 
 
@@ -106,6 +106,7 @@ class SuricataIngestionApiTests(unittest.TestCase):
         self.patches = [
             patch.object(history_repository, "settings", self.test_settings),
             patch.object(event_repository, "settings", self.test_settings),
+            patch.object(alert_repository, "settings", self.test_settings),
         ]
         for patcher in self.patches:
             patcher.start()
@@ -147,6 +148,22 @@ class SuricataIngestionApiTests(unittest.TestCase):
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(len(listed.json()["items"]), 1)
         self.assertEqual(listed.json()["items"][0]["raw_event"], payload["event"])
+
+    def test_ingestion_creates_deterministic_mitre_alert(self):
+        payload = {
+            "event": self._raw_event()
+            | {"alert": {"signature": "ET MALWARE Suspicious TLS Certificate", "severity": 1}}
+        }
+        response = self.client.post("/api/v1/events/ingest/suricata", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIsNotNone(body["alert_id"])
+        self.assertEqual(body["detection"]["mitre"]["technique"], "T1566")
+        alert = self.client.get(f"/api/v1/alerts/{body['alert_id']}")
+        self.assertEqual(alert.status_code, 200)
+        self.assertEqual(alert.json()["severity"], "CRITICAL")
+        self.assertIn("mitre:T1566", alert.json()["tags"])
 
     def test_invalid_event_and_non_soc_role_are_rejected(self):
         invalid = self.client.post(

@@ -51,6 +51,8 @@ class NormalizedEvent(BaseModel):
 class EventIngestResponse(BaseModel):
     event: NormalizedEvent
     inserted: bool
+    alert_id: int | None = None
+    detection: dict[str, Any] | None = None
 
 
 class SuricataEveIngestRequest(BaseModel):

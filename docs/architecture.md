@@ -16,9 +16,11 @@ FastAPI (backend/app/main.py, /api/v1)
    └── /incidents ─────── SQLite (high-risk queue, role-scoped status workflow/audit)
 ```
 
-L’ingestion Suricata est un premier adaptateur HTTP unitaire. Il ne collecte pas les
-journaux lui-même et son stockage n’alimente pas encore le moteur de règles, les
-alertes ou les corrélations.
+L’ingestion Suricata est un adaptateur HTTP unitaire. Elle normalise et conserve les
+événements réels, puis applique une première évaluation déterministe : score de risque,
+mapping MITRE ATT&CK heuristique, recommandations et création locale d’une alerte selon
+la sévérité. Elle ne taille pas encore un fichier/socket ni ne réalise une corrélation
+multi-entités. Le graphe de risque expose uniquement les relations présentes dans SQLite.
 
 ## Schémas et dépendances
 

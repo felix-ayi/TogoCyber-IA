@@ -31,6 +31,68 @@ def _score_label(score: int) -> str:
     return "Critical"
 
 
+def compute_risk_graph() -> dict:
+    """Build a local entity graph from persisted events, alerts, incidents and IOCs."""
+    nodes: dict[str, dict] = {}
+    edges: dict[tuple[str, str, str], dict] = {}
+
+    def node(node_id: str, node_type: str, label: str, severity: str | None = None) -> None:
+        if node_id not in nodes:
+            nodes[node_id] = {"id": node_id, "type": node_type, "label": label, "severity": severity}
+
+    def edge(source: str, target: str, relation: str) -> None:
+        edges[(source, target, relation)] = {"source": source, "target": target, "relation": relation}
+
+    with sqlite3.connect(settings.database_path, timeout=10) as connection:
+        connection.row_factory = sqlite3.Row
+        try:
+            for row in connection.execute(
+                "SELECT event_id, host, user, src_ip, dst_ip, severity FROM events LIMIT 200"
+            ).fetchall():
+                event_id = f"event:{row['event_id']}"
+                node(event_id, "event", row["event_id"][:12], row["severity"])
+                for entity_type, value, relation in (
+                    ("ip", row["src_ip"], "observed_from"),
+                    ("ip", row["dst_ip"], "targeted_asset"),
+                    ("host", row["host"], "observed_on"),
+                    ("user", row["user"], "associated_user"),
+                ):
+                    if value:
+                        entity_id = f"{entity_type}:{value}"
+                        node(entity_id, entity_type, str(value))
+                        edge(event_id, entity_id, relation) if entity_type not in {"host", "user"} else edge(entity_id, event_id, relation)
+
+            for row in connection.execute(
+                "SELECT id, title, severity FROM alerts LIMIT 200"
+            ).fetchall():
+                alert_id = f"alert:{row['id']}"
+                node(alert_id, "alert", row["title"][:80], row["severity"])
+                for event_row in connection.execute(
+                    "SELECT event_id FROM events WHERE message = ? LIMIT 20", (row["title"].replace("Suricata — ", "", 1),)
+                ).fetchall():
+                    edge(f"event:{event_row['event_id']}", alert_id, "raised")
+
+            for row in connection.execute(
+                "SELECT id, type, value, severity, status FROM iocs WHERE status = 'ACTIVE' LIMIT 200"
+            ).fetchall():
+                ioc_id = f"ioc:{row['id']}"
+                node(ioc_id, row["type"], row["value"], row["severity"])
+
+            for row in connection.execute(
+                "SELECT id, prediction AS title, severity FROM incidents LIMIT 200"
+            ).fetchall():
+                incident_id = f"incident:{row['id']}"
+                node(incident_id, "incident", row["title"][:80], row["severity"])
+                for alert_row in connection.execute(
+                    "SELECT id FROM alerts WHERE incident_id = ? LIMIT 100", (row["id"],)
+                ).fetchall():
+                    edge(f"alert:{alert_row['id']}", incident_id, "belongs_to")
+        except sqlite3.OperationalError:
+            pass
+
+    return {"nodes": list(nodes.values()), "edges": list(edges.values())}
+
+
 def compute_security_posture() -> dict:
     user_count = _count("SELECT COUNT(*) FROM users WHERE is_active = 1")
     analysis_count = _count("SELECT COUNT(*) FROM analysis_history")
@@ -44,7 +106,6 @@ def compute_security_posture() -> dict:
     audit_count = _count("SELECT COUNT(*) FROM audit_events")
     event_count = _count("SELECT COUNT(*) FROM events")
     phishing_count = _count("SELECT COUNT(*) FROM analysis_history WHERE module = 'phishing'")
-    network_count = _count("SELECT COUNT(*) FROM analysis_history WHERE module = 'network'")
     url_count = _count("SELECT COUNT(*) FROM analysis_history WHERE module = 'url'")
 
     categories = {

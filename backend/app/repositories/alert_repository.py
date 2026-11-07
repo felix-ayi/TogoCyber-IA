@@ -130,6 +130,29 @@ def list_alerts(
     return results
 
 
+def create_from_detection(
+    *, title: str, severity: str, risk_score: int, actor_user_id: int | None, tags: list[str]
+) -> dict:
+    """Create an alert from a real normalized network detection."""
+    if severity not in ALERT_SEVERITIES:
+        raise ValueError("unknown alert severity")
+    if not 0 <= risk_score <= 100:
+        raise ValueError("risk score must be between 0 and 100")
+    with _connection() as connection:
+        cursor = connection.execute(
+            "INSERT INTO alerts "
+            "(module, title, severity, risk_score) VALUES (?, ?, ?, ?)",
+            ("network", title[:500], severity, risk_score),
+        )
+        alert_id = int(cursor.lastrowid)
+        for tag in dict.fromkeys(tag for tag in tags if isinstance(tag, str) and 0 < len(tag) <= 48):
+            connection.execute(
+                "INSERT OR IGNORE INTO alert_tags (alert_id, tag) VALUES (?, ?)",
+                (alert_id, tag[:48]),
+            )
+    return get_alert(alert_id)
+
+
 def update_status(
     alert_id: int,
     new_status: str,
